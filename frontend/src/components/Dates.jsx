@@ -1,6 +1,4 @@
-import { SOCIALS } from '../data';
-
-export default function Dates({ data, loading, error }) {
+export default function Dates({ data, loading, error, social }) {
   return (
     <section className="section section-light tour" id="tour">
       <div className="section-head">
@@ -12,8 +10,7 @@ export default function Dates({ data, loading, error }) {
         {!loading && (error || !data?.length) && (
           <div className="dates-empty">
             {error ? 'Impossible de charger les dates.' : 'Aucune date annoncée pour le moment.'}
-            <br />
-            <a href={SOCIALS[0].url} target="_blank" rel="noopener">Suivez @maceunofficiel</a> pour les prochaines annonces.
+            {social && (<><br /><a href={social.url} target="_blank" rel="noopener">Suivez-le sur {social.label}</a> pour les prochaines annonces.</>)}
           </div>
         )}
         {data?.map((ev) => <DateRow key={ev.id ?? ev.datetime} ev={ev} />)}
