@@ -18,6 +18,7 @@ import { useParallax } from './hooks/useParallax';
 import { useReveal } from './hooks/useReveal';
 import { api } from './lib/api';
 import { lockScroll, scrollToTarget, unlockScroll } from './lib/scroll';
+import './styles/style.css';
 
 const TOPBAR_KEY = 'topbar-closed';
 
@@ -28,6 +29,7 @@ export default function App() {
 
   const releases = useFetch(api.releases);
   const events = useFetch(api.events);
+  const photos = useFetch(api.photos);
 
   useReveal();
   useParallax(ready);
@@ -87,7 +89,7 @@ export default function App() {
         <Music data={releases.data} error={releases.error} />
         <Dates data={events.data} loading={events.loading} error={events.error} />
         <About />
-        <Gallery />
+        <Gallery photos={photos.data} />
         <Faq />
         <Booking />
         <SocialCta />

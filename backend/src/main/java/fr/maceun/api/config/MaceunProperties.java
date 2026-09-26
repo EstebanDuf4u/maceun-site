@@ -6,9 +6,13 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "maceun")
-public record MaceunProperties(Cors cors, Bandsintown bandsintown, Booking booking) {
+public record MaceunProperties(Cors cors, Admin admin, Uploads uploads, Bandsintown bandsintown, Booking booking) {
 
     public record Cors(List<String> allowedOrigins) {}
+
+    public record Admin(String username, String password) {}
+
+    public record Uploads(String dir) {}
 
     public record Bandsintown(String baseUrl, String artist, String appId, Duration cacheTtl) {}
 

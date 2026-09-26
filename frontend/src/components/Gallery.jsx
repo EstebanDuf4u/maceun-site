@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { PHOTOS } from '../data';
 import Lightbox from './Lightbox';
 
-export default function Gallery() {
+export default function Gallery({ photos }) {
+  const list = photos?.length ? photos : PHOTOS;
   const trackRef = useRef(null);
   const moved = useRef(0);
   const [dragging, setDragging] = useState(false);
@@ -65,9 +66,9 @@ export default function Gallery() {
         <p className="section-sub reveal">Live &amp; backstage</p>
       </div>
       <div className={`gallery-track${dragging ? ' is-dragging' : ''}`} ref={trackRef} data-lenis-prevent-wheel>
-        {PHOTOS.map((p) => (
+        {list.map((p) => (
           <figure
-            key={p.src}
+            key={p.id ?? p.src}
             className={`g-item g-${p.shape}`}
             onClick={() => moved.current <= 6 && setOpen(p.src)}   // un drag n'ouvre pas la photo
           >

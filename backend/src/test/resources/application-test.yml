@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:maceun;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+
+maceun:
+  admin:
+    username: maceun
+    password: test-password
+  uploads:
+    dir: ${java.io.tmpdir}/maceun-test-uploads
