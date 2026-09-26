@@ -21,7 +21,7 @@ export default function Music({ data, error }) {
       </div>
 
       {error && <p className="dates-empty">Impossible de charger la discographie pour le moment.</p>}
-      {data ? <Feature release={data.latest} /> : !error && <div className="release-feature is-skeleton"><div className="release-cover" /></div>}
+      {data?.latest ? <Feature release={data.latest} /> : !error && !data && <div className="release-feature is-skeleton"><div className="release-cover" /></div>}
 
       {data?.previous?.length > 0 && (
         <>
@@ -34,7 +34,7 @@ export default function Music({ data, error }) {
           </div>
           <div className="releases" ref={sliderRef}>
             {data.previous.map((r) => (
-              <a className="release-card reveal" href={r.url} target="_blank" rel="noopener" key={r.slug}>
+              <a className="release-card reveal" href={r.url} target="_blank" rel="noopener" key={r.id}>
                 <div className="release-card-img">
                   <img src={r.cover} alt={`Pochette ${r.title}`} loading="lazy" />
                   <span className="play">▶</span>

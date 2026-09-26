@@ -21,7 +21,7 @@ public class ReleaseController {
     @GetMapping
     ResponseEntity<ReleasesResponse> list() {
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5)).cachePublic())
-                .body(releaseService.getReleases());
+                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(1)).cachePublic())
+                .body(releaseService.getPublicReleases());
     }
 }

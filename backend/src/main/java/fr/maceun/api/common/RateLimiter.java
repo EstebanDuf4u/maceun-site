@@ -1,35 +1,33 @@
-package fr.maceun.api.booking;
+package fr.maceun.api.common;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.stereotype.Component;
-
-import fr.maceun.api.config.MaceunProperties;
-
-/** Limite simple en mémoire : N demandes max par IP sur une fenêtre glissante. */
-@Component
+/** Limite simple en mémoire : N demandes max par clé (IP) sur une fenêtre glissante. */
 public class RateLimiter {
 
-    private final MaceunProperties.RateLimit config;
+    private final int maxRequests;
+    private final Duration window;
     private final Map<String, Deque<Instant>> hits = new ConcurrentHashMap<>();
 
-    public RateLimiter(MaceunProperties properties) {
-        this.config = properties.booking().rateLimit();
+    public RateLimiter(int maxRequests, Duration window) {
+        this.maxRequests = maxRequests;
+        this.window = window;
     }
 
     public void check(String key) {
         var now = Instant.now();
-        var windowStart = now.minus(config.window());
+        var windowStart = now.minus(window);
         var queue = hits.computeIfAbsent(key, k -> new ArrayDeque<>());
         synchronized (queue) {
             while (!queue.isEmpty() && queue.peekFirst().isBefore(windowStart)) {
                 queue.pollFirst();
             }
-            if (queue.size() >= config.maxRequests()) {
+            if (queue.size() >= maxRequests) {
                 throw new RateLimitExceededException();
             }
             queue.addLast(now);

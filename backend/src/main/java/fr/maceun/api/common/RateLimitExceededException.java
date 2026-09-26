@@ -1,4 +1,4 @@
-package fr.maceun.api.booking;
+package fr.maceun.api.common;
 
 public class RateLimitExceededException extends RuntimeException {
 }

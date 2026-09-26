@@ -1,12 +1,39 @@
 services:
+  db:
+    image: postgres:17-alpine
+    container_name: maceun-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: maceun
+      POSTGRES_USER: maceun
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Définir DB_PASSWORD dans .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maceun -d maceun"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./backend
     container_name: maceun-api
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
+      DB_URL: jdbc:postgresql://db:5432/maceun
+      DB_USER: maceun
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-maceun}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Définir ADMIN_PASSWORD dans .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       BANDSINTOWN_ARTIST: ${BANDSINTOWN_ARTIST:-DJ Maceun}
       BANDSINTOWN_APP_ID: ${BANDSINTOWN_APP_ID:-0ee6368fd3652519a6a69a1065f0283d}
       FORMSPREE_URL: ${FORMSPREE_URL:-https://formspree.io/f/xanwkaap}
+    volumes:
+      - uploads:/data/uploads
     expose:
       - "8080"
 
@@ -19,3 +46,7 @@ services:
         condition: service_healthy
     ports:
       - "${PORT:-8088}:80"
+
+volumes:
+  db-data:
+  uploads:

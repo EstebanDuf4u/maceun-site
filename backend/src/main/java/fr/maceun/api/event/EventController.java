@@ -17,7 +17,7 @@ public class EventController {
     }
 
     @GetMapping
-    List<Event> upcoming() {
+    List<EventView> upcoming() {
         return eventService.getUpcomingEvents();
     }
 }

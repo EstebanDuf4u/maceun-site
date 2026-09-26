@@ -5,12 +5,14 @@ import java.util.LinkedHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import fr.maceun.api.booking.BookingForwardException;
-import fr.maceun.api.booking.RateLimitExceededException;
+import fr.maceun.api.storage.InvalidImageException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -29,10 +31,32 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiError.of("BAD_REQUEST", "Requête invalide."));
     }
 
+    @ExceptionHandler(NotFoundException.class)
+    ResponseEntity<ApiError> onNotFound(NotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of("NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidImageException.class)
+    ResponseEntity<ApiError> onInvalidImage(InvalidImageException ex) {
+        return ResponseEntity.badRequest().body(ApiError.of("INVALID_IMAGE", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiError> onTooLarge(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(ApiError.of("TOO_LARGE", "Image trop lourde (10 Mo maximum)."));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiError> onBadCredentials(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiError.of("BAD_CREDENTIALS", "Identifiant ou mot de passe incorrect."));
+    }
+
     @ExceptionHandler(RateLimitExceededException.class)
     ResponseEntity<ApiError> onRateLimit(RateLimitExceededException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .body(ApiError.of("RATE_LIMIT", "Trop de demandes, réessayez dans quelques minutes."));
+                .body(ApiError.of("RATE_LIMIT", "Trop de tentatives, réessayez dans quelques minutes."));
     }
 
     @ExceptionHandler(BookingForwardException.class)
