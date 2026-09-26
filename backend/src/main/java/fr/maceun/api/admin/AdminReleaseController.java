@@ -1,8 +1,11 @@
 package fr.maceun.api.admin;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,13 +18,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import fr.maceun.api.release.ReleaseForm;
+import fr.maceun.api.release.AdminReleaseView;
 import fr.maceun.api.release.ReleaseService;
-import fr.maceun.api.release.ReleaseView;
 
 @RestController
 @RequestMapping("/api/admin/releases")
 public class AdminReleaseController {
+
+    /** @param manualReleaseDate uniquement pour un son pas encore sorti (sinon la date vient de Deezer) */
+    public record AddRelease(@NotBlank(message = "Lien obligatoire") @Size(max = 1000) String url, LocalDate manualReleaseDate) {}
+
+    public record UpdateRelease(boolean visible, LocalDate manualReleaseDate) {}
 
     private final ReleaseService releases;
 
@@ -30,19 +37,24 @@ public class AdminReleaseController {
     }
 
     @GetMapping
-    List<ReleaseView> list() {
+    List<AdminReleaseView> list() {
         return releases.listAll();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    ReleaseView create(@Valid @RequestBody ReleaseForm form) {
-        return releases.create(form);
+    AdminReleaseView add(@Valid @RequestBody AddRelease body) {
+        return releases.add(body.url(), body.manualReleaseDate());
     }
 
     @PutMapping("/{id}")
-    ReleaseView update(@PathVariable Long id, @Valid @RequestBody ReleaseForm form) {
-        return releases.update(id, form);
+    AdminReleaseView update(@PathVariable Long id, @RequestBody UpdateRelease body) {
+        return releases.update(id, body.visible(), body.manualReleaseDate());
+    }
+
+    @PostMapping("/{id}/sync")
+    AdminReleaseView sync(@PathVariable Long id) {
+        return releases.resync(id);
     }
 
     @DeleteMapping("/{id}")

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import fr.maceun.api.booking.BookingForwardException;
+import fr.maceun.api.release.source.LinkException;
 import fr.maceun.api.storage.InvalidImageException;
 
 @RestControllerAdvice
@@ -34,6 +35,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     ResponseEntity<ApiError> onNotFound(NotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.of("NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LinkException.class)
+    ResponseEntity<ApiError> onLink(LinkException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ApiError("INVALID_LINK", ex.getMessage(), java.util.Map.of("url", ex.getMessage())));
     }
 
     @ExceptionHandler(InvalidImageException.class)

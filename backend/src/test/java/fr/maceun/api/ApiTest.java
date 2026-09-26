@@ -10,6 +10,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,20 +26,30 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import fr.maceun.api.release.source.DeezerClient;
+import fr.maceun.api.release.source.DeezerInfo;
+import fr.maceun.api.release.source.LinkException;
+import fr.maceun.api.release.source.LinkMetadata;
+import fr.maceun.api.release.source.LinkScraper;
+import fr.maceun.api.release.source.Platform;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class ApiTest {
 
-    private static final String RELEASE_JSON = """
-            {"title":"Nouveau Son","genre":"Techno","releaseDate":"2027-01-15",
-             "cover":"/img/djm1.jpg","url":"https://maceun.fanlink.tv/nouveau","visible":true}
-            """;
-
     @Autowired
     MockMvc mvc;
+
+    @MockitoSpyBean
+    LinkScraper scraper;
+
+    @MockitoBean
+    DeezerClient deezer;
 
     // ----- public -----
 
@@ -99,48 +117,18 @@ class ApiTest {
     @Test
     void adminWriteWithoutCsrfIsRefused() throws Exception {
         mvc.perform(post("/api/admin/releases").with(user("maceun").roles("ADMIN"))
-                        .contentType(MediaType.APPLICATION_JSON).content(RELEASE_JSON))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"https://maceun.fanlink.tv/x\"}"))
                 .andExpect(status().isForbidden());
     }
 
     // ----- admin -----
 
-    @Test
-    void releaseCrud() throws Exception {
-        var admin = user("maceun").roles("ADMIN");
-        var body = mvc.perform(post("/api/admin/releases").with(admin).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content(RELEASE_JSON))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.title").value("Nouveau Son"))
-                .andReturn().getResponse().getContentAsString();
-        var id = body.replaceAll(".*\"id\":(\\d+).*", "$1");
 
-        // la sortie la plus récente devient la "latest" du site
-        mvc.perform(get("/api/releases")).andExpect(jsonPath("$.latest.title").value("Nouveau Son"));
-
-        mvc.perform(put("/api/admin/releases/" + id).with(admin).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content(RELEASE_JSON.replace("\"visible\":true", "\"visible\":false")))
-                .andExpect(status().isOk());
-        mvc.perform(get("/api/releases")).andExpect(jsonPath("$.latest.title").value("I Lose Myself"));
-
-        mvc.perform(delete("/api/admin/releases/" + id).with(admin).with(csrf())).andExpect(status().isNoContent());
-        mvc.perform(delete("/api/admin/releases/" + id).with(admin).with(csrf())).andExpect(status().isNotFound());
-    }
-
-    @Test
-    void releaseValidation() throws Exception {
-        mvc.perform(post("/api/admin/releases").with(user("maceun").roles("ADMIN")).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"title\":\"\",\"genre\":\"Techno\",\"releaseDate\":\"2027-01-15\",\"cover\":\"/img/x.jpg\",\"url\":\"pas-un-lien\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fields.title").exists())
-                .andExpect(jsonPath("$.fields.url").exists());
-    }
 
     @Test
     void uploadRejectsNonImages() throws Exception {
         var fake = new MockMultipartFile("file", "virus.jpg", "image/jpeg", "<?php echo 'hack'; ?>".getBytes());
-        mvc.perform(multipart("/api/admin/uploads").file(fake).with(user("maceun").roles("ADMIN")).with(csrf()))
+        mvc.perform(multipart("/api/admin/photos").file(fake).with(user("maceun").roles("ADMIN")).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("INVALID_IMAGE"));
     }
@@ -155,5 +143,74 @@ class ApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.src").value(org.hamcrest.Matchers.startsWith("/uploads/")))
                 .andExpect(jsonPath("$.shape").value("wide"));
+    }
+
+    // ----- sons (Fanlink + Deezer simulés) -----
+
+    @Test
+    void addReleaseFromFanlinkLink() throws Exception {
+        var url = "https://maceun.fanlink.tv/nouveau-son";
+        doReturn(new LinkMetadata("Nouveau Son", "https://i.scdn.co/cover.jpg", "FR1234567890",
+                List.of(new Platform("Spotify", "https://open.spotify.com/track/1"))))
+                .when(scraper).fetch(url);
+        when(deezer.find("FR1234567890", "Nouveau Son")).thenReturn(Optional.of(
+                new DeezerInfo(LocalDate.of(2027, 2, 1), "https://cdn.deezer/cover_xl.jpg", "Techno", "https://www.deezer.com/track/9")));
+        var admin = user("maceun").roles("ADMIN");
+
+        var body = mvc.perform(post("/api/admin/releases").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"" + url + "\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value("Nouveau Son"))
+                .andExpect(jsonPath("$.releaseDate").value("2027-02-01"))
+                .andExpect(jsonPath("$.cover").value("https://cdn.deezer/cover_xl.jpg"))
+                .andExpect(jsonPath("$.platforms[1].name").value("Deezer"))
+                .andReturn().getResponse().getContentAsString();
+        var id = body.replaceAll("^\\{\"id\":(\\d+).*", "$1");
+
+        // le plus récent devient la sortie mise en avant
+        mvc.perform(get("/api/releases")).andExpect(jsonPath("$.latest.title").value("Nouveau Son"))
+                .andExpect(jsonPath("$.latest.platforms[0].name").value("Spotify"));
+
+        // doublon refusé
+        mvc.perform(post("/api/admin/releases").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"" + url + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        // masqué → n'apparaît plus sur le site
+        mvc.perform(put("/api/admin/releases/" + id).with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"visible\":false}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/releases")).andExpect(jsonPath("$.latest.title").value(org.hamcrest.Matchers.not("Nouveau Son")));
+
+        mvc.perform(delete("/api/admin/releases/" + id).with(admin).with(csrf())).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void unreadableOrForeignLinksAreRefused() throws Exception {
+        var admin = user("maceun").roles("ADMIN");
+        mvc.perform(post("/api/admin/releases").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"https://evil.example/x\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_LINK"));
+
+        var dead = "https://maceun.fanlink.tv/lien-mort";
+        doThrow(new LinkException("La page du lien répond « 404 » (lien mort ?).")).when(scraper).fetch(dead);
+        mvc.perform(post("/api/admin/releases").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"" + dead + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("404")));
+        mvc.perform(get("/api/admin/releases").with(admin))
+                .andExpect(jsonPath("$[?(@.url == '" + dead + "')]").isEmpty());
+    }
+
+    @Test
+    void failedSyncKeepsLastKnownInfo() throws Exception {
+        // les sons de départ (migration) : un échec de mise à jour ne doit rien effacer
+        doThrow(new LinkException("Page du lien injoignable.")).when(scraper).fetch(org.mockito.ArgumentMatchers.anyString());
+        var admin = user("maceun").roles("ADMIN");
+        mvc.perform(post("/api/admin/releases/1/sync").with(admin).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Feel Your Love"))
+                .andExpect(jsonPath("$.syncError").value("Page du lien injoignable."));
     }
 }

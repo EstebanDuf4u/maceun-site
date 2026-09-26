@@ -373,6 +373,13 @@ body.is-ready .split-up { opacity: 1; transform: none; }
 .countdown span { display: block; margin-top: 6px; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--ml-400); }
 .countdown.is-out { display: none; }
 
+.platforms { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 28px; }
+.platforms a {
+  font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ml-400);
+  border-bottom: 1px solid transparent; transition: color .3s, border-color .3s;
+}
+.platforms a:hover { color: var(--white); border-color: var(--accent); }
+
 .slider-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
 .slider-title { font-weight: 800; font-variation-settings: "wdth" 125; text-transform: uppercase; font-size: 20px; }
 .slider-arrows { display: flex; gap: 8px; }

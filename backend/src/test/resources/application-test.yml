@@ -8,5 +8,7 @@ maceun:
   admin:
     username: maceun
     password: test-password
+  releases:
+    auto-sync: false
   uploads:
     dir: ${java.io.tmpdir}/maceun-test-uploads

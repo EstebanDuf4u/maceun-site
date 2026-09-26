@@ -1,23 +1,52 @@
 import { useState } from 'react';
 import { adminApi } from '../lib/api';
-import { DeleteButton, Field, ImageUpload, Modal, formatDate, useLoad } from './ui';
-
-const EMPTY = { title: '', subtitle: '', genre: 'Techno', releaseDate: '', cover: '', url: '', visible: true };
-const GENRES = ['Techno', 'Techno / Hard Techno', 'Hard Techno', 'House', 'Remix', 'Général'];
+import { DeleteButton, Field, Modal, formatDate, useLoad } from './ui';
 
 export default function ReleasesAdmin({ notify, onError }) {
   const [{ data: releases, loading }, reload] = useLoad(adminApi.releases, onError);
-  const [editing, setEditing] = useState(null);   // null | 'new' | release
+  const [url, setUrl] = useState('');
+  const [date, setDate] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [busy, setBusy] = useState(null);         // id en cours de mise à jour
 
   const today = new Date().toISOString().slice(0, 10);
-  const latestVisible = releases?.find((r) => r.visible);
+  const featured = releases?.find((r) => r.visible && r.title && r.releaseDate);
+
+  const add = async (e) => {
+    e.preventDefault();
+    setAdding(true); setAddError('');
+    try {
+      const r = await adminApi.addRelease(url, date);
+      notify(`« ${r.title} » ajouté`);
+      setUrl(''); setDate('');
+      reload();
+    } catch (err) {
+      if (err.status === 401) onError(err); else setAddError(err.message);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const sync = async (r) => {
+    setBusy(r.id);
+    try {
+      const updated = await adminApi.syncRelease(r.id);
+      notify(updated.syncError ? updated.syncError : `« ${updated.title} » mis à jour`, updated.syncError ? 'error' : 'ok');
+      reload();
+    } catch (err) { onError(err); } finally { setBusy(null); }
+  };
+
+  const toggle = async (r) => {
+    setBusy(r.id);
+    try { await adminApi.updateRelease(r.id, !r.visible, r.manualReleaseDate); reload(); }
+    catch (err) { onError(err); } finally { setBusy(null); }
+  };
 
   const remove = async (r) => {
-    try {
-      await adminApi.deleteRelease(r.id);
-      notify(`« ${r.title} » supprimée`);
-      reload();
-    } catch (err) { onError(err); }
+    try { await adminApi.deleteRelease(r.id); notify(`« ${r.title ?? r.url} » retiré`); reload(); }
+    catch (err) { onError(err); }
   };
 
   return (
@@ -25,29 +54,51 @@ export default function ReleasesAdmin({ notify, onError }) {
       <div className="adm-head">
         <div>
           <h1>Sorties</h1>
-          <p className="adm-muted">La sortie visible la plus récente est mise en avant sur le site (compte à rebours si elle n'est pas encore sortie).</p>
+          <p className="adm-muted">
+            Collez le lien Fanlink d'un son : le titre, la pochette et les plateformes sont récupérés sur Fanlink,
+            la date de sortie et le genre sur Deezer. Tout est remis à jour automatiquement toutes les 6 h.
+          </p>
         </div>
-        <button className="adm-btn adm-btn-primary" onClick={() => setEditing('new')}>+ Nouvelle sortie</button>
       </div>
 
+      <form className="adm-panel adm-add" onSubmit={add}>
+        <Field label="Lien Fanlink" error={addError}>
+          <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://maceun.fanlink.tv/…" required />
+        </Field>
+        <Field label="Date de sortie (optionnel)" hint="Seulement si le son n'est pas encore sorti.">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <button className="adm-btn adm-btn-primary" disabled={adding}>{adding ? 'Récupération…' : 'Ajouter'}</button>
+      </form>
+
       {loading && <p className="adm-muted">Chargement…</p>}
-      {releases?.length === 0 && <p className="adm-empty">Aucune sortie pour l'instant.</p>}
+      {releases?.length === 0 && <p className="adm-empty">Aucun son pour l'instant.</p>}
 
       <div className="adm-cards">
         {releases?.map((r) => (
           <article key={r.id} className={`adm-card${r.visible ? '' : ' is-hidden'}`}>
-            <img src={r.cover} alt="" className="adm-card-cover" />
+            {r.cover ? <img src={r.cover} alt="" className="adm-card-cover" /> : <div className="adm-card-cover" />}
             <div className="adm-card-body">
               <div className="adm-badges">
-                {r.id === latestVisible?.id && <span className="adm-badge adm-badge-accent">Mise en avant</span>}
+                {r.id === featured?.id && <span className="adm-badge adm-badge-accent">Mise en avant</span>}
                 {r.releaseDate > today && <span className="adm-badge">À venir</span>}
-                {!r.visible && <span className="adm-badge adm-badge-muted">Masquée</span>}
+                {!r.visible && <span className="adm-badge adm-badge-muted">Masqué</span>}
+                {r.syncError && <span className="adm-badge adm-badge-error">Erreur</span>}
               </div>
-              <h3>{r.title}{r.subtitle && <em> ({r.subtitle})</em>}</h3>
-              <p className="adm-muted">{String(r.number).padStart(2, '0')} · {formatDate(r.releaseDate)} · {r.genre}</p>
+              <h3>{r.title ?? 'Sans titre'}</h3>
+              <p className="adm-muted">
+                {[r.releaseDate && formatDate(r.releaseDate), r.genre].filter(Boolean).join(' · ') || 'Date inconnue'}
+                {r.manualReleaseDate && ' (date saisie)'}
+              </p>
+              {r.platforms?.length > 0 && <p className="adm-platforms">{r.platforms.map((p) => p.name).join(' · ')}</p>}
+              {r.syncError && <p className="adm-error">{r.syncError}</p>}
+              <a href={r.url} target="_blank" rel="noopener" className="adm-card-link">{r.url.replace(/^https:\/\//, '')}</a>
+              <p className="adm-hint">{r.syncedAt ? `Mis à jour ${formatDate(r.syncedAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Jamais mis à jour'}</p>
               <div className="adm-card-actions">
-                <button className="adm-btn" onClick={() => setEditing(r)}>Modifier</button>
-                <DeleteButton onConfirm={() => remove(r)} />
+                <button className="adm-btn adm-btn-small" disabled={busy === r.id} onClick={() => sync(r)}>{busy === r.id ? '…' : 'Actualiser'}</button>
+                <button className="adm-btn adm-btn-small" disabled={busy === r.id} onClick={() => toggle(r)}>{r.visible ? 'Masquer' : 'Afficher'}</button>
+                <button className="adm-btn adm-btn-small" onClick={() => setEditing(r)}>Date</button>
+                <DeleteButton onConfirm={() => remove(r)} label="Retirer" />
               </div>
             </div>
           </article>
@@ -55,14 +106,10 @@ export default function ReleasesAdmin({ notify, onError }) {
       </div>
 
       {editing && (
-        <ReleaseForm
-          initial={editing === 'new' ? EMPTY : editing}
+        <DateForm
+          release={editing}
           onClose={() => setEditing(null)}
-          onSaved={(saved, isNew) => {
-            setEditing(null);
-            notify(isNew ? `« ${saved.title} » ajoutée` : 'Modifications enregistrées');
-            reload();
-          }}
+          onSaved={() => { setEditing(null); notify('Date enregistrée'); reload(); }}
           onError={onError}
         />
       )}
@@ -70,63 +117,29 @@ export default function ReleasesAdmin({ notify, onError }) {
   );
 }
 
-function ReleaseForm({ initial, onClose, onSaved, onError }) {
-  const [form, setForm] = useState({ ...EMPTY, ...initial, subtitle: initial.subtitle ?? '' });
-  const [errors, setErrors] = useState({});
+function DateForm({ release, onClose, onSaved, onError }) {
+  const [date, setDate] = useState(release.manualReleaseDate ?? '');
   const [saving, setSaving] = useState(false);
-  const isNew = !initial.id;
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
-
-  const submit = async (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    setSaving(true); setErrors({});
-    const payload = { title: form.title, subtitle: form.subtitle, genre: form.genre, releaseDate: form.releaseDate,
-      cover: form.cover, url: form.url, visible: form.visible };
-    try {
-      const saved = isNew ? await adminApi.createRelease(payload) : await adminApi.updateRelease(initial.id, payload);
-      onSaved(saved, isNew);
-    } catch (err) {
-      setErrors(err.fields || {});
-      if (!Object.keys(err.fields || {}).length) onError(err);
-      setSaving(false);
-    }
+    setSaving(true);
+    try { await adminApi.updateRelease(release.id, release.visible, date); onSaved(); }
+    catch (err) { onError(err); setSaving(false); }
   };
-
   return (
-    <Modal title={isNew ? 'Nouvelle sortie' : `Modifier « ${initial.title} »`} onClose={onClose}>
-      <form className="adm-form adm-form-release" onSubmit={submit}>
-        <div className="adm-form-cover">
-          <ImageUpload value={form.cover} onChange={(cover) => setForm((f) => ({ ...f, cover }))} onError={onError} />
-          {errors.cover && <small className="adm-field-error">{errors.cover}</small>}
-          <small className="adm-hint">Carré, idéalement 1000 × 1000 px (JPG, PNG ou WebP, 10 Mo max).</small>
-        </div>
-        <div className="adm-form-fields">
-          <Field label="Titre" error={errors.title}>
-            <input value={form.title} onChange={set('title')} required maxLength={200} />
-          </Field>
-          <Field label="Précision (optionnel)" hint="Ex : Remix Techno, Extended Mix…" error={errors.subtitle}>
-            <input value={form.subtitle} onChange={set('subtitle')} maxLength={200} />
-          </Field>
-          <div className="adm-row">
-            <Field label="Genre" error={errors.genre}>
-              <input value={form.genre} onChange={set('genre')} list="genres" required maxLength={120} />
-              <datalist id="genres">{GENRES.map((g) => <option key={g} value={g} />)}</datalist>
-            </Field>
-            <Field label="Date de sortie" error={errors.releaseDate}>
-              <input type="date" value={form.releaseDate} onChange={set('releaseDate')} required />
-            </Field>
-          </div>
-          <Field label="Lien d'écoute / pre-save" hint="Fanlink, Hypeddit, Spotify…" error={errors.url}>
-            <input type="url" value={form.url} onChange={set('url')} placeholder="https://" required />
-          </Field>
-          <label className="adm-check">
-            <input type="checkbox" checked={form.visible} onChange={set('visible')} />
-            <span>Visible sur le site</span>
-          </label>
-          <div className="adm-form-actions">
-            <button type="button" className="adm-btn adm-btn-ghost" onClick={onClose}>Annuler</button>
-            <button className="adm-btn adm-btn-primary" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
-          </div>
+    <Modal title={`Date de sortie · ${release.title ?? ''}`} onClose={onClose}>
+      <form className="adm-form" onSubmit={save}>
+        <p className="adm-muted">
+          Utile uniquement pour un son pas encore sorti (compte à rebours sur le site).
+          Dès que Deezer connaît le son, c'est sa date qui est utilisée.
+        </p>
+        <Field label="Date de sortie">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <div className="adm-form-actions">
+          {release.manualReleaseDate && <button type="button" className="adm-btn adm-btn-ghost" onClick={() => setDate('')}>Effacer</button>}
+          <button type="button" className="adm-btn adm-btn-ghost" onClick={onClose}>Annuler</button>
+          <button className="adm-btn adm-btn-primary" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
         </div>
       </form>
     </Modal>

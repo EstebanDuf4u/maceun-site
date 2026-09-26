@@ -1,5 +1,6 @@
 package fr.maceun.api.release;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,77 +8,82 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import fr.maceun.api.common.NotFoundException;
-import fr.maceun.api.storage.StorageService;
+import fr.maceun.api.release.source.LinkException;
+import fr.maceun.api.release.source.LinkScraper;
 
 @Service
 public class ReleaseService {
 
     private final ReleaseRepository repository;
-    private final StorageService storage;
+    private final ReleaseSync sync;
+    private final LinkScraper scraper;
 
-    public ReleaseService(ReleaseRepository repository, StorageService storage) {
+    public ReleaseService(ReleaseRepository repository, ReleaseSync sync, LinkScraper scraper) {
         this.repository = repository;
-        this.storage = storage;
+        this.sync = sync;
+        this.scraper = scraper;
     }
 
-    /** Site public : sorties visibles, la plus récente devient la "latest". */
+    /** Site public : sons visibles et complets, du plus récent au plus ancien. */
     @Transactional(readOnly = true)
     public ReleasesResponse getPublicReleases() {
-        var views = numbered(repository.findByVisibleTrueOrderByReleaseDateDesc());
+        var shown = repository.findAllByOrderByReleaseDateDescIdDesc().stream()
+                .filter(r -> r.isVisible() && r.getTitle() != null && r.getReleaseDate() != null)
+                .toList();
+        var views = new ArrayList<ReleaseView>(shown.size());
+        for (int i = 0; i < shown.size(); i++) {
+            var r = shown.get(i);
+            views.add(new ReleaseView(r.getId(), shown.size() - i, r.getTitle(), r.getGenre(), r.getReleaseDate(),
+                    r.getCover(), r.getUrl(), sync.platforms(r)));
+        }
         if (views.isEmpty()) return new ReleasesResponse(null, List.of());
         return new ReleasesResponse(views.getFirst(), views.subList(1, views.size()));
     }
 
     @Transactional(readOnly = true)
-    public List<ReleaseView> listAll() {
-        return numbered(repository.findAllByOrderByReleaseDateDesc());
+    public List<AdminReleaseView> listAll() {
+        return repository.findAllByOrderByReleaseDateDescIdDesc().stream().map(this::toAdmin).toList();
     }
 
-    @Transactional
-    public ReleaseView create(ReleaseForm form) {
+    /** Ajoute un son à partir de son lien ; refusé si le lien est illisible. */
+    public AdminReleaseView add(String url, LocalDate manualReleaseDate) {
+        var clean = scraper.validate(url).toString();
+        if (repository.existsByUrl(clean)) throw new LinkException("Ce son est déjà dans la liste.");
         var release = new Release();
-        apply(release, form);
-        repository.save(release);
-        return find(release.getId());
+        release.setUrl(clean);
+        release.setManualReleaseDate(manualReleaseDate);
+        release = sync.sync(release);
+        if (release.getTitle() == null) {
+            var error = release.getSyncError();
+            repository.delete(release);
+            throw new LinkException(error != null ? error : "Impossible de lire ce lien.");
+        }
+        return toAdmin(release);
     }
 
-    @Transactional
-    public ReleaseView update(Long id, ReleaseForm form) {
-        var release = repository.findById(id).orElseThrow(() -> new NotFoundException("Sortie"));
-        var oldCover = release.getCover();
-        apply(release, form);
-        if (!oldCover.equals(form.cover())) storage.deleteIfUploaded(oldCover);
-        return find(id);
+    public AdminReleaseView update(Long id, boolean visible, LocalDate manualReleaseDate) {
+        var release = find(id);
+        release.setVisible(visible);
+        release.setManualReleaseDate(manualReleaseDate);
+        return toAdmin(sync.sync(release));
+    }
+
+    public AdminReleaseView resync(Long id) {
+        return toAdmin(sync.sync(find(id)));
     }
 
     @Transactional
     public void delete(Long id) {
-        var release = repository.findById(id).orElseThrow(() -> new NotFoundException("Sortie"));
-        repository.delete(release);
-        storage.deleteIfUploaded(release.getCover());
+        repository.delete(find(id));
     }
 
-    private ReleaseView find(Long id) {
-        return listAll().stream().filter(r -> r.id().equals(id)).findFirst()
-                .orElseThrow(() -> new NotFoundException("Sortie"));
+    private Release find(Long id) {
+        return repository.findById(id).orElseThrow(() -> new NotFoundException("Son"));
     }
 
-    private static void apply(Release r, ReleaseForm f) {
-        r.setTitle(f.title().strip());
-        r.setSubtitle(f.subtitle() == null || f.subtitle().isBlank() ? null : f.subtitle().strip());
-        r.setGenre(f.genre().strip());
-        r.setReleaseDate(f.releaseDate());
-        r.setCover(f.cover().strip());
-        r.setUrl(f.url().strip());
-        r.setVisible(f.isVisible());
-    }
-
-    /** Liste triée du plus récent au plus ancien → numéro 01 pour le plus ancien. */
-    private static List<ReleaseView> numbered(List<Release> newestFirst) {
-        var out = new ArrayList<ReleaseView>(newestFirst.size());
-        for (int i = 0; i < newestFirst.size(); i++) {
-            out.add(ReleaseView.of(newestFirst.get(i), newestFirst.size() - i));
-        }
-        return out;
+    private AdminReleaseView toAdmin(Release r) {
+        return new AdminReleaseView(r.getId(), r.getUrl(), r.isVisible(), r.getManualReleaseDate(), r.getTitle(),
+                r.getGenre(), r.getReleaseDate(), r.getCover(), r.getIsrc(), sync.platforms(r), r.getSyncedAt(),
+                r.getSyncError());
     }
 }
