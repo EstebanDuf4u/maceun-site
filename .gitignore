@@ -5,3 +5,6 @@ backend/target/
 .idea/
 .vscode/
 backend/uploads/
+*.kate-swp
+*.swp
+*~
