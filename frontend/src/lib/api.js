@@ -54,20 +54,14 @@ export const adminApi = {
   logout: () => request('/auth/logout', { method: 'POST' }),
 
   releases: () => request('/admin/releases'),
-  createRelease: (r) => request('/admin/releases', { method: 'POST', json: r }),
-  updateRelease: (id, r) => request(`/admin/releases/${id}`, { method: 'PUT', json: r }),
+  addRelease: (url, manualReleaseDate) => request('/admin/releases', { method: 'POST', json: { url, manualReleaseDate: manualReleaseDate || null } }),
+  updateRelease: (id, visible, manualReleaseDate) => request(`/admin/releases/${id}`, { method: 'PUT', json: { visible, manualReleaseDate: manualReleaseDate || null } }),
+  syncRelease: (id) => request(`/admin/releases/${id}/sync`, { method: 'POST' }),
   deleteRelease: (id) => request(`/admin/releases/${id}`, { method: 'DELETE' }),
-
-  events: () => request('/admin/events'),
-  bandsintownEvents: () => request('/admin/events/bandsintown'),
-  createEvent: (e) => request('/admin/events', { method: 'POST', json: e }),
-  updateEvent: (id, e) => request(`/admin/events/${id}`, { method: 'PUT', json: e }),
-  deleteEvent: (id) => request(`/admin/events/${id}`, { method: 'DELETE' }),
 
   addPhoto: (file) => request('/admin/photos', { method: 'POST', form: withFile(file) }),
   setPhotoShape: (id, shape) => request(`/admin/photos/${id}`, { method: 'PATCH', json: { shape } }),
   reorderPhotos: (ids) => request('/admin/photos/order', { method: 'PUT', json: ids }),
   deletePhoto: (id) => request(`/admin/photos/${id}`, { method: 'DELETE' }),
 
-  upload: (file) => request('/admin/uploads', { method: 'POST', form: withFile(file) }),
 };

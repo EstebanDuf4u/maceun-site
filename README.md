@@ -18,11 +18,14 @@ elles survivent aux redémarrages et aux mises à jour.
 
 ## Espace admin
 
-Maceun peut, sans toucher au code :
+Les **sons** et les **dates** sont récupérés automatiquement :
 
-- **Sorties** : ajouter / modifier / masquer / supprimer un son, avec sa pochette.
-  La sortie visible la plus récente est mise en avant (compte à rebours si elle n'est pas encore sortie).
-- **Dates** : ajouter des dates à la main, en plus de celles de Bandsintown (affichées en lecture seule).
+- **Sorties** : Maceun colle le lien **Fanlink** d'un son. Le back récupère le titre, la pochette et les
+  plateformes (page Fanlink), puis la date de sortie, le genre et la pochette HD (**API Deezer**, par ISRC
+  ou titre). Tout est remis à jour toutes les 6 h ; si un lien ne répond plus, les dernières infos sont
+  gardées et l'erreur s'affiche dans l'admin. Pour un son pas encore sorti, une date peut être saisie
+  (compte à rebours sur le site) ; sinon, sans Deezer, c'est la date de création du lien Fanlink.
+- **Dates** : uniquement **Bandsintown** (lecture seule dans l'admin, cache 10 min).
 - **Photos** : ajouter (glisser-déposer), réordonner, choisir paysage/portrait, supprimer.
 
 Sécurité : compte unique défini dans `.env`, session HttpOnly de 8 h, protection CSRF,
@@ -33,12 +36,12 @@ En production (HTTPS), mettre `COOKIE_SECURE=true`.
 
 | Route | Rôle |
 |---|---|
-| `GET /api/releases` | Dernière sortie + discographie |
-| `GET /api/events` | Prochaines dates (Bandsintown + dates ajoutées), cache Bandsintown 10 min |
+| `GET /api/releases` | Dernière sortie + discographie (Fanlink + Deezer, synchro toutes les 6 h) |
+| `GET /api/events` | Prochaines dates Bandsintown, cache 10 min |
 | `GET /api/photos` | Galerie |
 | `POST /api/booking` | Formulaire de booking → validé, anti-spam, puis transmis à Formspree |
 | `POST /api/auth/login` · `/logout` · `GET /me` | Connexion admin |
-| `/api/admin/**` | Gestion des sorties, dates, photos, envoi d'images (connexion requise) |
+| `/api/admin/**` | Ajout de sons par lien Fanlink, photos (connexion requise) |
 
 ## Développer sans Docker
 

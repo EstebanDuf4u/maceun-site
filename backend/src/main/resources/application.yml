@@ -48,6 +48,11 @@ maceun:
     artist: ${BANDSINTOWN_ARTIST:DJ Maceun}
     app-id: ${BANDSINTOWN_APP_ID:0ee6368fd3652519a6a69a1065f0283d}
     cache-ttl: 10m
+  releases:
+    allowed-hosts: fanlink.tv, fanlink.to, toneden.io, hypeddit.com
+    deezer-artist: ${DEEZER_ARTIST:DJ Maceun}
+    sync-interval: 6h
+    auto-sync: true
   booking:
     formspree-url: ${FORMSPREE_URL:https://formspree.io/f/xanwkaap}
     rate-limit:
