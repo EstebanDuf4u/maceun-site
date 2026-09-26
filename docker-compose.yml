@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: ./backend
+    container_name: maceun-api
+    restart: unless-stopped
+    environment:
+      BANDSINTOWN_ARTIST: ${BANDSINTOWN_ARTIST:-DJ Maceun}
+      BANDSINTOWN_APP_ID: ${BANDSINTOWN_APP_ID:-0ee6368fd3652519a6a69a1065f0283d}
+      FORMSPREE_URL: ${FORMSPREE_URL:-https://formspree.io/f/xanwkaap}
+    expose:
+      - "8080"
+
+  frontend:
+    build: ./frontend
+    container_name: maceun-front
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8088}:80"
