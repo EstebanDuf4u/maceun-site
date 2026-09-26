@@ -256,7 +256,7 @@ body.is-ready .hero-img { transform: scale(1.05); }
 .hero-title {
   display: flex; justify-content: space-between;
   font-weight: 900; font-variation-settings: "wdth" 125;
-  font-size: calc((100vw - 2 * var(--pad)) / (var(--letters, 6) * .96)); line-height: .78; letter-spacing: -.02em;
+  font-size: calc((100vw - 2 * var(--pad)) / 5.75); line-height: .78; letter-spacing: -.02em;
   overflow: hidden; padding-top: .06em;
   margin: 0 -.02em;
 }
@@ -266,6 +266,12 @@ body.is-ready .hero-img { transform: scale(1.05); }
   transition: transform 1.2s var(--ease);
 }
 body.is-ready .hero-letter { transform: none; }
+.hero-letter:nth-child(1) { transition-delay: .10s; }
+.hero-letter:nth-child(2) { transition-delay: .16s; }
+.hero-letter:nth-child(3) { transition-delay: .22s; }
+.hero-letter:nth-child(4) { transition-delay: .28s; }
+.hero-letter:nth-child(5) { transition-delay: .34s; }
+.hero-letter:nth-child(6) { transition-delay: .40s; }
 
 .hero-bottom {
   display: flex; justify-content: space-between; align-items: center; gap: 20px;
@@ -570,7 +576,7 @@ body.is-ready .split-up { opacity: 1; transform: none; }
 .footer-cta:hover svg { transform: translateX(12px) rotate(-45deg); }
 .footer-wordmark {
   font-weight: 900; font-variation-settings: "wdth" 125;
-  font-size: calc((100vw - 2 * var(--pad)) / (var(--letters, 6) * .93)); line-height: .8; letter-spacing: -.03em;
+  font-size: calc((100vw - 2 * var(--pad)) / 5.6); line-height: .8; letter-spacing: -.03em;
   text-align: center; margin: 40px -.03em 24px;
 }
 .footer-meta { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: var(--ml-500); }

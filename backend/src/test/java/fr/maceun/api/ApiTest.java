@@ -156,47 +156,4 @@ class ApiTest {
                 .andExpect(jsonPath("$.src").value(org.hamcrest.Matchers.startsWith("/uploads/")))
                 .andExpect(jsonPath("$.shape").value("wide"));
     }
-
-    // ----- contenu du site -----
-
-    @Test
-    void contentIsPublic() throws Exception {
-        mvc.perform(get("/api/content"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.hero.name").value("MACEUN"))
-                .andExpect(jsonPath("$.socials[0].label").value("Instagram"))
-                .andExpect(jsonPath("$.faq.length()").value(4));
-    }
-
-    @Test
-    void contentUpdateIsValidatedAndSaved() throws Exception {
-        var admin = user("maceun").roles("ADMIN");
-        var original = mvc.perform(get("/api/admin/content").with(admin))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-        // lien invalide et image hors des dossiers autorisés → refusés, champ par champ
-        var invalid = original.replace("https://www.tiktok.com/@maceunofficiel\"}", "tiktok\"}")
-                .replace("\"image\":\"/img/djm4.jpg\"", "\"image\":\"https://evil.example/x.jpg\"");
-        mvc.perform(put("/api/admin/content").with(admin).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content(invalid))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fields['socials[2].url']").exists())
-                .andExpect(jsonPath("$.fields['hero.image']").exists());
-
-        var updated = original.replace("DJ · Producer · Performer", "DJ · Producteur");
-        mvc.perform(put("/api/admin/content").with(admin).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content(updated))
-                .andExpect(status().isOk());
-        mvc.perform(get("/api/content")).andExpect(jsonPath("$.hero.tagline").value("DJ · Producteur"));
-
-        // remise en état pour les autres tests
-        mvc.perform(put("/api/admin/content").with(admin).with(csrf())
-                .contentType(MediaType.APPLICATION_JSON).content(original)).andExpect(status().isOk());
-    }
-
-    @Test
-    void contentUpdateRequiresAdmin() throws Exception {
-        mvc.perform(put("/api/admin/content").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isUnauthorized());
-    }
 }

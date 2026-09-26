@@ -27,7 +27,6 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [topBar, setTopBar] = useState(false);
 
-  const content = useFetch(api.content);
   const releases = useFetch(api.releases);
   const events = useFetch(api.events);
   const photos = useFetch(api.photos);
@@ -48,31 +47,6 @@ export default function App() {
     if (!ready) return;
     menuOpen ? lockScroll() : unlockScroll();
   }, [ready, menuOpen]);
-
-  // titre et description de l'onglet depuis le contenu
-  const c = content.data;
-  useEffect(() => {
-    if (!c) return;
-    const name = c.hero.name.charAt(0) + c.hero.name.slice(1).toLowerCase();
-    document.title = `DJ ${name} | Official Website`;
-    document.querySelector('meta[name="description"]')?.setAttribute('content', `${c.hero.tagline} · ${c.hero.genres}`);
-
-    // données structurées pour Google, générées depuis le contenu
-    let ld = document.getElementById('ld-json');
-    if (!ld) {
-      ld = Object.assign(document.createElement('script'), { id: 'ld-json', type: 'application/ld+json' });
-      document.head.appendChild(ld);
-    }
-    ld.textContent = JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'MusicGroup',
-      name: `DJ ${name}`,
-      url: window.location.origin,
-      image: new URL(c.hero.image, window.location.origin).href,
-      genre: c.hero.genres.split(/\s*[—·,]\s*/).filter(Boolean),
-      sameAs: c.socials.map((s) => s.url),
-    });
-  }, [c]);
 
   const onLoaded = useCallback(() => {
     setReady(true);
@@ -105,22 +79,22 @@ export default function App() {
 
   return (
     <>
-      <Loader onDone={onLoaded} contentReady={!content.loading} />
+      <Loader onDone={onLoaded} />
       <TopBar release={releases.data?.latest} onClose={closeTopBar} />
       <Header menuOpen={menuOpen} onToggleMenu={() => setMenuOpen((o) => !o)} />
-      <Nav open={menuOpen} content={c} />
+      <Nav open={menuOpen} />
       <main id="top">
-        <Hero hero={c?.hero} />
+        <Hero />
         <Marquee release={releases.data?.latest} />
         <Music data={releases.data} error={releases.error} />
-        <Dates data={events.data} loading={events.loading} error={events.error} social={c?.socials?.[0]} />
-        <About about={c?.about} />
+        <Dates data={events.data} loading={events.loading} error={events.error} />
+        <About />
         <Gallery photos={photos.data} />
-        <Faq faq={c?.faq} />
-        <Booking contact={c?.contact} />
-        <SocialCta socials={c?.socials} image={c?.contact?.socialImage} />
+        <Faq />
+        <Booking />
+        <SocialCta />
       </main>
-      <Footer name={c?.hero?.name} streamingUrl={c?.contact?.streamingUrl} />
+      <Footer />
     </>
   );
 }

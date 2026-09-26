@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { PHOTOS } from '../data';
 import Lightbox from './Lightbox';
 
 export default function Gallery({ photos }) {
-  const list = photos ?? [];
+  const list = photos?.length ? photos : PHOTOS;
   const trackRef = useRef(null);
   const moved = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [open, setOpen] = useState(null);
 
-  const hasPhotos = list.length > 0;
-
   useEffect(() => {
     const track = trackRef.current;
-    if (!track) return;
     let down = false, startX = 0, startScroll = 0, lastX = 0, velocity = 0, raf;
 
     const onDown = (e) => {
@@ -59,9 +57,7 @@ export default function Gallery({ photos }) {
       window.removeEventListener('pointerup', onUp);
       track.removeEventListener('wheel', onWheel);
     };
-  }, [hasPhotos]);
-
-  if (!hasPhotos) return null;
+  }, []);
 
   return (
     <section className="section gallery" id="gallery">
