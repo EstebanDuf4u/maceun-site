@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { reduceMotion } from '../lib/scroll';
 
 /** Croix qui tourne par crans + compteur, puis le cercle s'ouvre sur le site. */
-export default function Loader({ onDone }) {
+/** @param contentReady le contenu du site est chargé (sinon le hero serait vide à l'ouverture) */
+export default function Loader({ onDone, contentReady }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
   const onDoneRef = useRef(onDone);
+  const readyRef = useRef(contentReady);
+  readyRef.current = contentReady;
 
   useEffect(() => {
     const start = performance.now();
@@ -16,7 +19,7 @@ export default function Loader({ onDone }) {
     let raf;
     const tick = (now) => {
       const t = Math.min((now - start) / minDuration, 1);
-      const shown = loaded ? t : Math.min(t, 0.9);     // bloque à 90 % tant que la page charge
+      const shown = loaded && readyRef.current ? t : Math.min(t, 0.9);     // bloque à 90 % tant que la page ou le contenu charge
       setCount(Math.round(shown * 100));
       if (shown < 1) { raf = requestAnimationFrame(tick); return; }
       setDone(true);
