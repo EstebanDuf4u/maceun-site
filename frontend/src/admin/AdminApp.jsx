@@ -4,14 +4,12 @@ import Login from './Login';
 import ReleasesAdmin from './ReleasesAdmin';
 import EventsAdmin from './EventsAdmin';
 import PhotosAdmin from './PhotosAdmin';
-import ContentAdmin from './ContentAdmin';
 import './admin.css';
 
 const TABS = [
   { id: 'releases', label: 'Sorties', component: ReleasesAdmin },
   { id: 'events', label: 'Dates', component: EventsAdmin },
   { id: 'photos', label: 'Photos', component: PhotosAdmin },
-  { id: 'content', label: 'Infos', component: ContentAdmin },
 ];
 
 const tabFromHash = () => TABS.find((t) => `#${t.id}` === window.location.hash)?.id ?? 'releases';

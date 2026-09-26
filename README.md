@@ -24,10 +24,6 @@ Maceun peut, sans toucher au code :
   La sortie visible la plus récente est mise en avant (compte à rebours si elle n'est pas encore sortie).
 - **Dates** : ajouter des dates à la main, en plus de celles de Bandsintown (affichées en lecture seule).
 - **Photos** : ajouter (glisser-déposer), réordonner, choisir paysage/portrait, supprimer.
-- **Infos** : tous les textes, liens et images du site (accueil, bio, chiffres, contact, réseaux, FAQ).
-  Dans les textes, `*mot*` s'affiche en italique ; liens et numéros deviennent cliquables.
-
-Le front ne contient aucun contenu en dur : tout passe par l'API.
 
 Sécurité : compte unique défini dans `.env`, session HttpOnly de 8 h, protection CSRF,
 limite de 10 tentatives de connexion par IP toutes les 15 min, images vérifiées (vrai JPG/PNG/WebP).
@@ -37,7 +33,6 @@ En production (HTTPS), mettre `COOKIE_SECURE=true`.
 
 | Route | Rôle |
 |---|---|
-| `GET /api/content` | Textes, liens et images du site (accueil, bio, contact, réseaux, FAQ) |
 | `GET /api/releases` | Dernière sortie + discographie |
 | `GET /api/events` | Prochaines dates (Bandsintown + dates ajoutées), cache Bandsintown 10 min |
 | `GET /api/photos` | Galerie |

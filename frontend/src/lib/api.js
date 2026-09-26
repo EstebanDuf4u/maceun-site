@@ -45,7 +45,6 @@ export const api = {
   releases: () => request('/releases'),
   events: () => request('/events'),
   photos: () => request('/photos'),
-  content: () => request('/content'),
   booking: (payload) => request('/booking', { method: 'POST', json: payload }),
 };
 
@@ -69,9 +68,6 @@ export const adminApi = {
   setPhotoShape: (id, shape) => request(`/admin/photos/${id}`, { method: 'PATCH', json: { shape } }),
   reorderPhotos: (ids) => request('/admin/photos/order', { method: 'PUT', json: ids }),
   deletePhoto: (id) => request(`/admin/photos/${id}`, { method: 'DELETE' }),
-
-  content: () => request('/admin/content'),
-  saveContent: (c) => request('/admin/content', { method: 'PUT', json: c }),
 
   upload: (file) => request('/admin/uploads', { method: 'POST', form: withFile(file) }),
 };

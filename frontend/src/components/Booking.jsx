@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
-import { telHref } from '../lib/text';
+import { PHONE } from '../data';
 
 const EMPTY = { nom: '', email: '', message: '', website: '' };
 
-export default function Booking({ contact }) {
+export default function Booking() {
   const [form, setForm] = useState(EMPTY);
   const [status, setStatus] = useState('idle');        // idle | sending | sent | error
   const [errors, setErrors] = useState({});
@@ -32,8 +32,10 @@ export default function Booking({ contact }) {
         <div>
           <h2 className="section-title reveal">Booking</h2>
           <p className="booking-lead reveal">Travaillons <em>ensemble.</em></p>
-          {contact?.bookingText && <p className="booking-text reveal">{contact.bookingText}</p>}
-          {contact?.phone && <a href={telHref(contact.phone)} className="booking-phone reveal">{contact.phone}</a>}
+          <p className="booking-text reveal">
+            Vous voulez booker Maceun pour votre événement ? Remplissez le formulaire, vous aurez une réponse au plus vite.
+          </p>
+          <a href={PHONE.href} className="booking-phone reveal">{PHONE.label}</a>
         </div>
 
         <form className={`form reveal${status === 'sent' ? ' is-sent' : ''}`} onSubmit={submit} noValidate>
