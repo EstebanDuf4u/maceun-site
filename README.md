@@ -3,7 +3,11 @@
 - `frontend/` : React (Vite) + CSS, servi par Nginx. Site public sur `/`, espace admin sur `/admin`
 - `backend/` : API Java 21 / Spring Boot 4 + PostgreSQL
 
-## Lancer avec Docker
+## Production
+
+Déploiement continu sur https://maceunofficiel.fr à chaque push sur `main` : voir [docs/DEPLOY.md](docs/DEPLOY.md).
+
+## Lancer avec Docker (local)
 
 ```bash
 cp .env.example .env      # puis remplir DB_PASSWORD et ADMIN_PASSWORD
