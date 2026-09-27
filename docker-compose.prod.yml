@@ -1,0 +1,61 @@
+# Production : `docker compose -f docker-compose.prod.yml up -d --build`.
+# Variables lues dans `.env` à la racine (sur le serveur uniquement, jamais dans git) —
+# modèle : deploy/.env.prod.example. Même serveur et même principe que rutrack.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: maceun
+      POSTGRES_USER: maceun
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD manquant dans .env}
+    volumes:
+      - maceun_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maceun -d maceun"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Pas de port publié : la base n'est joignable que depuis le réseau compose.
+
+  backend:
+    build:
+      context: ./backend
+      # Réseau de l'hôte pendant le build : le serveur n'a que des DNS IPv6, injoignables
+      # depuis le réseau bridge de BuildKit (Maven ne résoudrait rien sinon).
+      network: host
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/maceun
+      DB_USER: maceun
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-maceun}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD manquant dans .env}
+      COOKIE_SECURE: "true"
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN:?DOMAIN manquant dans .env}
+      BANDSINTOWN_ARTIST: ${BANDSINTOWN_ARTIST:-DJ Maceun}
+      BANDSINTOWN_APP_ID: ${BANDSINTOWN_APP_ID:-0ee6368fd3652519a6a69a1065f0283d}
+      FORMSPREE_URL: ${FORMSPREE_URL:-https://formspree.io/f/xanwkaap}
+      JAVA_OPTS: -XX:MaxRAMPercentage=60
+    volumes:
+      - maceun_uploads:/data/uploads
+
+  web:
+    build:
+      context: ./frontend
+      network: host
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    # Uniquement en local : le nginx de l'hôte termine le HTTPS et proxifie ici
+    # (deploy/nginx-maceun.conf). rutrack utilise déjà 127.0.0.1:8080.
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8081}:80"
+
+volumes:
+  maceun_db_data:
+  maceun_uploads:

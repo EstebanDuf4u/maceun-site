@@ -1,0 +1,113 @@
+# Tests à chaque push / PR ; déploiement sur le serveur à chaque push sur main
+# (seulement si les tests passent). Même serveur et même principe que rutrack.
+#
+# Secrets GitHub requis (Settings → Secrets and variables → Actions) :
+#   SSH_HOST, SSH_USER, SSH_PASSWORD, SSH_KNOWN_HOSTS, DEPLOY_PATH
+# Le `.env` de production vit uniquement sur le serveur (modèle : deploy/.env.prod.example).
+name: CI/CD
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # Base H2 en mémoire (profil test) : pas besoin de Postgres ici.
+      - run: mvn -B -q test
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [backend-tests, frontend-build]
+    runs-on: ubuntu-latest
+    # Un seul déploiement à la fois ; un push plus récent attend la fin du précédent.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      # Les secrets ne sont pas lisibles dans un `if:` : on passe par l'env.
+      DEPLOY_CONFIGURED: ${{ secrets.SSH_PASSWORD != '' && secrets.SSH_HOST != '' }}
+    steps:
+      - name: Skip if the server is not configured yet
+        if: env.DEPLOY_CONFIGURED != 'true'
+        run: echo "::notice::Secrets SSH absents (voir docs/DEPLOY.md) — déploiement ignoré."
+
+      - uses: actions/checkout@v5
+        if: env.DEPLOY_CONFIGURED == 'true'
+
+      - name: Configure SSH
+        if: env.DEPLOY_CONFIGURED == 'true'
+        run: |
+          sudo apt-get install -y -qq sshpass
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Check server setup
+        if: env.DEPLOY_CONFIGURED == 'true'
+        # Le .env de prod est créé une seule fois par deploy/setup-server.sh.
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: >
+          sshpass -e ssh -o PubkeyAuthentication=no "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          "test -f '${{ secrets.DEPLOY_PATH }}/.env'
+          || { echo '::error::.env absent sur le serveur : lancer deploy/setup-server.sh (voir docs/DEPLOY.md)'; exit 1; }"
+
+      - name: Sync code to server
+        if: env.DEPLOY_CONFIGURED == 'true'
+        # --delete garde le serveur identique au repo ; `.env` (exclu) n'est jamais touché.
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: >
+          rsync -az --delete
+          --exclude '.git' --exclude '.github' --exclude '.env'
+          --exclude 'node_modules' --exclude 'dist' --exclude 'target' --exclude 'uploads'
+          -e "sshpass -e ssh -o PubkeyAuthentication=no"
+          ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+
+      - name: Rebuild and restart
+        if: env.DEPLOY_CONFIGURED == 'true'
+        # Migrations Flyway appliquées au démarrage du backend.
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: >
+          sshpass -e ssh -o PubkeyAuthentication=no "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          "cd '${{ secrets.DEPLOY_PATH }}'
+          && docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 300
+          && docker image prune -f"
+
+      - name: Smoke test
+        if: env.DEPLOY_CONFIGURED == 'true'
+        # Vérifie depuis le serveur que le site et l'API répondent (sans dépendre du DNS).
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+        run: >
+          sshpass -e ssh -o PubkeyAuthentication=no "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          "cd '${{ secrets.DEPLOY_PATH }}'
+          && PORT=\$(grep -E '^WEB_PORT=' .env | cut -d= -f2) && PORT=\${PORT:-8081}
+          && curl -fsS -o /dev/null http://127.0.0.1:\$PORT/
+          && curl -fsS http://127.0.0.1:\$PORT/api/releases | head -c 200"
