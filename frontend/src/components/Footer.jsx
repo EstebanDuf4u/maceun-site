@@ -12,6 +12,7 @@ export default function Footer() {
       </div>
       <div className="footer-wordmark" aria-hidden="true">MACEUN</div>
       <div className="footer-meta">
+        <img src="/img/logo-noir.png" alt="" className="footer-logo" width="36" height="36" />
         <span>© {new Date().getFullYear()} DJ Maceun · Tous droits réservés</span>
         <a href="#top">Retour en haut ↑</a>
       </div>

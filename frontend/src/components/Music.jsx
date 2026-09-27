@@ -21,7 +21,7 @@ export default function Music({ data, error }) {
       </div>
 
       {error && <p className="dates-empty">Impossible de charger la discographie pour le moment.</p>}
-      {data ? <Feature release={data.latest} /> : !error && <div className="release-feature is-skeleton"><div className="release-cover" /></div>}
+      {data?.latest ? <Feature release={data.latest} /> : !error && !data && <div className="release-feature is-skeleton"><div className="release-cover" /></div>}
 
       {data?.previous?.length > 0 && (
         <>
@@ -34,13 +34,13 @@ export default function Music({ data, error }) {
           </div>
           <div className="releases" ref={sliderRef}>
             {data.previous.map((r) => (
-              <a className="release-card reveal" href={r.url} target="_blank" rel="noopener" key={r.slug}>
+              <a className="release-card reveal" href={r.url} target="_blank" rel="noopener" key={r.id}>
                 <div className="release-card-img">
                   <img src={r.cover} alt={`Pochette ${r.title}`} loading="lazy" />
                   <span className="play">▶</span>
                 </div>
-                <p className="release-card-meta">{pad(r.number)} · {new Date(r.releaseDate).getFullYear()} · {r.genre}</p>
-                <h4>{r.title}{r.subtitle && <> <em>({r.subtitle})</em></>}</h4>
+                <p className="release-card-meta">{[pad(r.number), new Date(r.releaseDate).getFullYear(), r.genre].filter(Boolean).join(' · ')}</p>
+                <h4><Title title={r.title} /></h4>
               </a>
             ))}
           </div>
@@ -71,7 +71,7 @@ function Feature({ release }) {
       </div>
       <div className="release-info">
         <p className="eyebrow">Single · {new Date(release.releaseDate).getFullYear()}</p>
-        <h3 className="release-title">{release.title}</h3>
+        <h3 className="release-title"><Title title={release.title} /></h3>
         <p className="release-text">
           {upcoming
             ? `Retrouvez le dernier titre de DJ Maceun sur toutes les plateformes de streaming le ${dateLong}.`
@@ -81,9 +81,22 @@ function Feature({ release }) {
         <a href={release.url} target="_blank" rel="noopener" className="btn btn-light">
           <span>{upcoming ? `Pre-save · ${dateShort}` : 'Écouter maintenant'}</span>
         </a>
+        {!upcoming && release.platforms?.length > 0 && (
+          <ul className="platforms">
+            {release.platforms.map((p) => (
+              <li key={p.name}><a href={p.url} target="_blank" rel="noopener">{p.name}</a></li>
+            ))}
+          </ul>
+        )}
       </div>
     </article>
   );
 }
 
 const pad = (n) => String(n).padStart(2, '0');
+
+/** « Salle Vide (Techno Remix) » → la partie entre parenthèses en italique, comme sur le reste du site. */
+function Title({ title }) {
+  const m = title.match(/^(.*?)\s*\((.+)\)\s*$/);
+  return m ? <>{m[1]} <em>({m[2]})</em></> : title;
+}

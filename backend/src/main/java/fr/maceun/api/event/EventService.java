@@ -15,8 +15,8 @@ import org.springframework.web.client.RestClientException;
 import fr.maceun.api.config.MaceunProperties;
 
 /**
- * Récupère les prochaines dates sur Bandsintown côté serveur (pas de souci CORS, clé non exposée)
- * et les garde en cache quelques minutes.
+ * Prochaines dates, récupérées sur Bandsintown côté serveur (pas de souci CORS, clé non exposée)
+ * et gardées en cache quelques minutes.
  */
 @Service
 public class EventService {
@@ -27,7 +27,7 @@ public class EventService {
     private final RestClient client;
     private final MaceunProperties.Bandsintown config;
 
-    private volatile List<Event> cached = List.of();
+    private volatile List<EventView> cached = List.of();
     private volatile Instant cachedAt = Instant.EPOCH;
 
     public EventService(RestClient.Builder builder, MaceunProperties properties) {
@@ -35,7 +35,7 @@ public class EventService {
         this.client = builder.baseUrl(config.baseUrl()).build();
     }
 
-    public synchronized List<Event> getUpcomingEvents() {
+    public synchronized List<EventView> getUpcomingEvents() {
         if (Instant.now().isBefore(cachedAt.plus(config.cacheTtl()))) {
             return cached;
         }
@@ -49,7 +49,7 @@ public class EventService {
                     .body(BandsintownEvent[].class);
             cached = raw == null ? List.of() : Arrays.stream(raw)
                     .filter(Objects::nonNull)
-                    .map(EventService::toEvent)
+                    .map(EventService::toView)
                     .limit(MAX_EVENTS)
                     .toList();
             cachedAt = Instant.now();
@@ -60,9 +60,9 @@ public class EventService {
         return cached;
     }
 
-    private static Event toEvent(BandsintownEvent e) {
+    private static EventView toView(BandsintownEvent e) {
         var venue = e.venue();
-        return new Event(
+        return new EventView(
                 e.id(),
                 e.datetime() == null ? null : LocalDateTime.parse(e.datetime()),
                 venue == null ? null : venue.name(),

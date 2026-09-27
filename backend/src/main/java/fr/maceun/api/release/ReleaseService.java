@@ -1,37 +1,89 @@
 package fr.maceun.api.release;
 
 import java.time.LocalDate;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Discographie. Pour ajouter un son : une ligne dans la liste, la sortie la plus récente
- * devient automatiquement la "latest".
- */
+import fr.maceun.api.common.NotFoundException;
+import fr.maceun.api.release.source.LinkException;
+import fr.maceun.api.release.source.LinkScraper;
+
 @Service
 public class ReleaseService {
 
-    private static final String TECHNO = "Techno / Hard Techno";
+    private final ReleaseRepository repository;
+    private final ReleaseSync sync;
+    private final LinkScraper scraper;
 
-    private final List<Release> releases = List.of(
-            new Release("i-lose-myself", 5, "I Lose Myself", null, "Techno",
-                    LocalDate.of(2026, 10, 2), "/img/i-lose-myself.jpg", "https://hypeddit.com/qbfvvm"),
-            new Release("everything-is-romantic", 4, "Everything is romantic", "Remix Techno", TECHNO,
-                    LocalDate.of(2026, 6, 1), "/img/everything-is-romantic.jpg", "https://maceun.fanlink.tv/everything_is_romantic"),
-            new Release("salle-vide", 3, "Salle Vide", "Techno Remix", TECHNO,
-                    LocalDate.of(2026, 4, 1), "/img/salle-vide.jpg", "https://maceun.fanlink.tv/salle-vide"),
-            new Release("safe-and-sound", 2, "Safe And Sound", null, TECHNO,
-                    LocalDate.of(2026, 2, 1), "/img/safe-and-sound.jpg", "https://fanlink.tv/safe-and-sound-maceun"),
-            new Release("feel-your-love", 1, "Feel Your Love", null, TECHNO,
-                    LocalDate.of(2026, 1, 1), "/img/feel-your-love.jpg", "https://maceun.fanlink.tv/feel-your-love")
-    );
+    public ReleaseService(ReleaseRepository repository, ReleaseSync sync, LinkScraper scraper) {
+        this.repository = repository;
+        this.sync = sync;
+        this.scraper = scraper;
+    }
 
-    public ReleasesResponse getReleases() {
-        var sorted = releases.stream()
-                .sorted(Comparator.comparing(Release::releaseDate).reversed())
+    /** Site public : sons visibles et complets, du plus récent au plus ancien. */
+    @Transactional(readOnly = true)
+    public ReleasesResponse getPublicReleases() {
+        var shown = repository.findAllByOrderByReleaseDateDescIdDesc().stream()
+                .filter(r -> r.isVisible() && r.getTitle() != null && r.getReleaseDate() != null)
                 .toList();
-        return new ReleasesResponse(sorted.getFirst(), sorted.subList(1, sorted.size()));
+        var views = new ArrayList<ReleaseView>(shown.size());
+        for (int i = 0; i < shown.size(); i++) {
+            var r = shown.get(i);
+            views.add(new ReleaseView(r.getId(), shown.size() - i, r.getTitle(), r.getGenre(), r.getReleaseDate(),
+                    r.getCover(), r.getUrl(), sync.platforms(r)));
+        }
+        if (views.isEmpty()) return new ReleasesResponse(null, List.of());
+        return new ReleasesResponse(views.getFirst(), views.subList(1, views.size()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminReleaseView> listAll() {
+        return repository.findAllByOrderByReleaseDateDescIdDesc().stream().map(this::toAdmin).toList();
+    }
+
+    /** Ajoute un son à partir de son lien ; refusé si le lien est illisible. */
+    public AdminReleaseView add(String url, LocalDate manualReleaseDate) {
+        var clean = scraper.validate(url).toString();
+        if (repository.existsByUrl(clean)) throw new LinkException("Ce son est déjà dans la liste.");
+        var release = new Release();
+        release.setUrl(clean);
+        release.setManualReleaseDate(manualReleaseDate);
+        release = sync.sync(release);
+        if (release.getTitle() == null) {
+            var error = release.getSyncError();
+            repository.delete(release);
+            throw new LinkException(error != null ? error : "Impossible de lire ce lien.");
+        }
+        return toAdmin(release);
+    }
+
+    public AdminReleaseView update(Long id, boolean visible, LocalDate manualReleaseDate) {
+        var release = find(id);
+        release.setVisible(visible);
+        release.setManualReleaseDate(manualReleaseDate);
+        return toAdmin(sync.sync(release));
+    }
+
+    public AdminReleaseView resync(Long id) {
+        return toAdmin(sync.sync(find(id)));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        repository.delete(find(id));
+    }
+
+    private Release find(Long id) {
+        return repository.findById(id).orElseThrow(() -> new NotFoundException("Son"));
+    }
+
+    private AdminReleaseView toAdmin(Release r) {
+        return new AdminReleaseView(r.getId(), r.getUrl(), r.isVisible(), r.getManualReleaseDate(), r.getTitle(),
+                r.getGenre(), r.getReleaseDate(), r.getCover(), r.getIsrc(), sync.platforms(r), r.getSyncedAt(),
+                r.getSyncError());
     }
 }
