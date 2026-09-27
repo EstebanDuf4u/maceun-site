@@ -50,7 +50,7 @@ export default function Booking() {
             <span>{status === 'sending' ? 'Envoi…' : status === 'error' ? 'Réessayer' : 'Envoyer la demande'}</span>
           </button>
           {status === 'error' && <p className="form-error" role="alert">{errorMsg}</p>}
-          <p className="form-success" role="status">✓ Message envoyé. Réponse sous 48h.</p>
+          <p className="form-success" role="status">✓ Message envoyé.</p>
         </form>
       </div>
     </section>
