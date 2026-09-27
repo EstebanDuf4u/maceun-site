@@ -11,7 +11,6 @@
   --a-ok: #3ddc97;
   --a-radius: 10px;
   --f-display: "Archivo", system-ui, sans-serif;
-  --f-serif: "Instrument Serif", Georgia, serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,7 +21,7 @@ body.admin {
 }
 body.admin a { color: inherit; }
 body.admin button, body.admin input { font: inherit; color: inherit; }
-body.admin em { font-family: var(--f-serif); font-style: italic; font-weight: 400; }
+body.admin em { font-style: normal; }
 body.admin img { display: block; max-width: 100%; }
 
 .adm-muted { color: var(--a-muted); }
@@ -65,12 +64,9 @@ body.admin img { display: block; max-width: 100%; }
   background: var(--a-panel); border: 1px solid var(--a-line); border-radius: 16px;
   display: flex; flex-direction: column; gap: 16px;
 }
-.adm-login-logo { width: 44px; height: 44px; }
+.adm-login-logo { width: 56px; height: 56px; }
 .adm-login-card h1 { font-weight: 900; font-variation-settings: "wdth" 125; text-transform: uppercase; font-size: 26px; line-height: 1; }
 
-/* logos */
-.adm-login-logo circle, .adm-brand circle { fill: none; stroke: currentColor; stroke-width: 6; }
-.adm-login-logo path, .adm-brand path { fill: currentColor; }
 
 /* ----- layout ----- */
 .adm-top {
@@ -81,7 +77,7 @@ body.admin img { display: block; max-width: 100%; }
   border-bottom: 1px solid var(--a-line);
 }
 .adm-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 900; font-variation-settings: "wdth" 125; }
-.adm-brand svg { width: 26px; height: 26px; }
+.adm-brand img { width: 30px; height: 30px; }
 .adm-brand small { font-weight: 500; color: var(--a-muted); font-variation-settings: "wdth" 100; }
 .adm-tabs { display: flex; gap: 4px; margin: 0 auto; }
 .adm-tabs a {

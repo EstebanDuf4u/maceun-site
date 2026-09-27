@@ -21,7 +21,7 @@ export default function Login({ onLogged }) {
   return (
     <div className="adm-login">
       <form className="adm-login-card" onSubmit={submit}>
-        <svg viewBox="0 0 100 100" className="adm-login-logo"><circle cx="50" cy="50" r="46" /><path d="M44 22h12v22h22v12H56v22H44V56H22V44h22z" /></svg>
+        <img src="/img/logo-blanc.png" alt="" className="adm-login-logo" width="56" height="56" />
         <h1>Espace admin</h1>
         <p className="adm-muted">Gérer les sorties, les dates et les photos du site.</p>
         <label className="adm-field">
