@@ -16,8 +16,13 @@ Internet ─▶ Cloudflare (DNS) ─▶ nginx de l'hôte (HTTPS, certbot) ─▶
                                                                                      └─▶ backend (Spring) ─▶ db (Postgres)
 ```
 
-- **nginx de l'hôte** : `/etc/nginx/sites-available/maceunofficiel.fr` (modèle : `deploy/nginx-maceun.conf`).
+- **nginx de l'hôte** = le reverse proxy : il choisit le site selon le domaine demandé.
+  `/etc/nginx/sites-available/maceunofficiel.fr` (modèle : `deploy/nginx-maceun.conf`).
   Il sert aussi rutrack, deb1, deb2 — ne pas y toucher.
+  ⚠️ Chaque domaine doit avoir **son propre bloc 443** : sinon nginx répond avec le premier site
+  HTTPS configuré (rutrack). C'est ce qui arrive quand Cloudflare (proxy orange) contacte le serveur.
+- **HTTPS** : Let's Encrypt obtenu par `certbot certonly --webroot` (marche derrière Cloudflare),
+  renouvellement automatique + rechargement de nginx (`--deploy-hook`).
 - **`docker-compose.prod.yml`** : `web` (n'écoute que sur `127.0.0.1:8081`, rutrack a 8080),
   `backend` (cookies `Secure`), `db` (volume `maceun_db_data`, aucun port publié),
   images envoyées dans le volume `maceun_uploads`.
@@ -38,13 +43,9 @@ Internet ─▶ Cloudflare (DNS) ─▶ nginx de l'hôte (HTTPS, certbot) ─▶
    gh secret set SSH_PASSWORD -R EstebanDuf4u/maceun-site
    ```
 
-3. **DNS chez Cloudflare** (compte du domaine maceunofficiel.fr) : enregistrements `A` de
-   `maceunofficiel.fr` et `www` → `79.175.70.167`, **proxy désactivé (nuage gris)** le temps
-   d'obtenir le certificat. Puis sur le serveur :
-   ```bash
-   sudo certbot --nginx -d maceunofficiel.fr -d www.maceunofficiel.fr --redirect
-   ```
-   Le proxy Cloudflare peut ensuite être réactivé, avec SSL/TLS en mode **Full (strict)**.
+3. **DNS chez Cloudflare** : enregistrements `A` de `maceunofficiel.fr` et `www` → `79.175.70.167`
+   (proxy orange ou gris, les deux marchent ; SSL/TLS en mode **Full (strict)**).
+   Relancer ensuite le script de l'étape 1 s'il n'avait pas pu obtenir le certificat.
 
 ## Secrets GitHub (Settings → Secrets and variables → Actions)
 

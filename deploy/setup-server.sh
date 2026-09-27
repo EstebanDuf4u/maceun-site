@@ -44,20 +44,38 @@ else
   echo "→ $DEPLOY_PATH/.env existe déjà : conservé."
 fi
 
-# 3. Site nginx de l'hôte (ne touche pas aux autres sites : rutrack, deb1, deb2)
-sed "s/__WEB_PORT__/$PORT/" "$HERE/nginx-maceun.conf" | sudo tee "$SITE" > /dev/null
+# 3. Certificat : auto-signé d'abord (nginx a besoin d'un bloc 443 pour ce domaine, sinon il
+#    répond avec le premier site HTTPS venu, c'est-à-dire rutrack), puis Let's Encrypt.
+LE="/etc/letsencrypt/live/$DOMAIN"
+if sudo test -f "$LE/fullchain.pem"; then
+  CERT="$LE/fullchain.pem"; KEY="$LE/privkey.pem"
+else
+  sudo mkdir -p /etc/ssl/maceun
+  sudo test -f /etc/ssl/maceun/fullchain.pem || sudo openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
+    -subj "/CN=$DOMAIN" -addext "subjectAltName=DNS:$DOMAIN,DNS:www.$DOMAIN" \
+    -keyout /etc/ssl/maceun/privkey.pem -out /etc/ssl/maceun/fullchain.pem 2>/dev/null
+  CERT=/etc/ssl/maceun/fullchain.pem; KEY=/etc/ssl/maceun/privkey.pem
+fi
+
+# 4. Site nginx de l'hôte (ne touche pas aux autres sites : rutrack, deb1, deb2)
+sudo mkdir -p /var/www/certbot
+sed -e "s/__WEB_PORT__/$PORT/" -e "s#__CERT__#$CERT#" -e "s#__KEY__#$KEY#" "$HERE/nginx-maceun.conf" | sudo tee "$SITE" > /dev/null
 sudo ln -sf "$SITE" "/etc/nginx/sites-enabled/$DOMAIN"
 sudo nginx -t
 sudo systemctl reload nginx
-echo "→ nginx : $SITE activé"
+echo "→ nginx : $SITE activé (certificat : $CERT)"
 
-# 4. Certificat HTTPS : seulement si le domaine pointe déjà vers ce serveur
-SERVER_IP=$(curl -4 -s https://ifconfig.me || true)
-if dig +short A "$DOMAIN" | grep -qx "$SERVER_IP"; then
-  sudo certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --redirect --non-interactive --agree-tos \
-    --register-unsafely-without-email --keep-until-expiring
-  echo "→ HTTPS actif : https://$DOMAIN"
-else
-  echo "⚠ $DOMAIN ne pointe pas encore vers ce serveur ($SERVER_IP) : HTTPS non configuré."
-  echo "  Après la bascule DNS, relancer : sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --redirect"
+# 5. Let's Encrypt par webroot : fonctionne aussi derrière le proxy Cloudflare
+if [ "$CERT" != "$LE/fullchain.pem" ]; then
+  if sudo certbot certonly --webroot -w /var/www/certbot -d "$DOMAIN" -d "www.$DOMAIN" \
+       --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring \
+       --deploy-hook "systemctl reload nginx"; then
+    sudo sed -i -e "s#/etc/ssl/maceun/fullchain.pem#$LE/fullchain.pem#" -e "s#/etc/ssl/maceun/privkey.pem#$LE/privkey.pem#" "$SITE"
+    sudo nginx -t && sudo systemctl reload nginx && sudo rm -rf /etc/ssl/maceun
+    echo "→ HTTPS Let's Encrypt actif : https://$DOMAIN (renouvellement automatique)"
+  else
+    echo "⚠ Certificat Let's Encrypt impossible pour l'instant (DNS pas encore basculé ?)."
+    echo "  Le site tourne avec un certificat auto-signé (OK derrière Cloudflare en mode Full)."
+    echo "  Relancer ce script après la bascule DNS."
+  fi
 fi
