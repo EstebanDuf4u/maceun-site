@@ -23,6 +23,7 @@ public class Release {
     private String url;
     private LocalDate manualReleaseDate;
     private boolean visible = true;
+    private boolean pinned;
 
     // récupéré automatiquement (dernière valeur connue)
     private String title;
@@ -41,6 +42,8 @@ public class Release {
     public void setManualReleaseDate(LocalDate manualReleaseDate) { this.manualReleaseDate = manualReleaseDate; }
     public boolean isVisible() { return visible; }
     public void setVisible(boolean visible) { this.visible = visible; }
+    public boolean isPinned() { return pinned; }
+    public void setPinned(boolean pinned) { this.pinned = pinned; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getCover() { return cover; }

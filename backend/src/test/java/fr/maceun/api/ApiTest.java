@@ -213,4 +213,60 @@ class ApiTest {
                 .andExpect(jsonPath("$.title").value("Feel Your Love"))
                 .andExpect(jsonPath("$.syncError").value("Page du lien injoignable."));
     }
+
+    // ----- épingler / modifier -----
+
+    @Test
+    void pinnedReleaseIsFeaturedInsteadOfNewest() throws Exception {
+        var admin = user("maceun").roles("ADMIN");
+        // son 1 (Feel Your Love, le plus ancien) épinglé → mis en avant
+        mvc.perform(put("/api/admin/releases/1/pin").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"pinned\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == 1)].pinned").value(true));
+        mvc.perform(get("/api/releases"))
+                .andExpect(jsonPath("$.latest.id").value(1))
+                .andExpect(jsonPath("$.latest.number").value(1))          // numéro inchangé
+                .andExpect(jsonPath("$.previous[0].title").value("I Lose Myself"));
+
+        // un seul épinglé à la fois
+        mvc.perform(put("/api/admin/releases/2/pin").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"pinned\":true}"))
+                .andExpect(jsonPath("$[?(@.pinned == true)].id").value(org.hamcrest.Matchers.contains(2)));
+
+        // désépingler → retour au plus récent
+        mvc.perform(put("/api/admin/releases/2/pin").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"pinned\":false}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/releases")).andExpect(jsonPath("$.latest.title").value("I Lose Myself"));
+    }
+
+    @Test
+    void editReleaseLink() throws Exception {
+        var admin = user("maceun").roles("ADMIN");
+        var newUrl = "https://maceun.fanlink.tv/safe-and-sound-v2";
+        doReturn(new LinkMetadata("Safe And Sound", null, null, List.of())).when(scraper).fetch(newUrl);
+
+        mvc.perform(put("/api/admin/releases/2").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"" + newUrl + "\",\"visible\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.url").value(newUrl));
+
+        // lien mort → refusé, l'ancien lien est gardé
+        var dead = "https://maceun.fanlink.tv/mort";
+        doThrow(new LinkException("La page du lien répond « 404 » (lien mort ?).")).when(scraper).fetch(dead);
+        mvc.perform(put("/api/admin/releases/2").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"url\":\"" + dead + "\",\"visible\":true}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/releases").with(admin))
+                .andExpect(jsonPath("$[?(@.id == 2)].url").value(newUrl));
+
+        // lien déjà utilisé par un autre son → refusé
+        mvc.perform(put("/api/admin/releases/2").with(admin).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://maceun.fanlink.tv/feel-your-love\",\"visible\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Ce lien est déjà utilisé par un autre son."));
+    }
 }

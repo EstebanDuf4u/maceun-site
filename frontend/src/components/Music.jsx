@@ -21,7 +21,7 @@ export default function Music({ data, error }) {
       </div>
 
       {error && <p className="dates-empty">Impossible de charger la discographie pour le moment.</p>}
-      {data?.latest ? <Feature release={data.latest} /> : !error && !data && <div className="release-feature is-skeleton"><div className="release-cover" /></div>}
+      {data?.latest ? <Feature release={data.latest} newest={!data.previous?.some((p) => p.releaseDate > data.latest.releaseDate)} /> : !error && !data && <div className="release-feature is-skeleton"><div className="release-cover" /></div>}
 
       {data?.previous?.length > 0 && (
         <>
@@ -50,7 +50,7 @@ export default function Music({ data, error }) {
   );
 }
 
-function Feature({ release }) {
+function Feature({ release, newest = true }) {
   const upcoming = new Date(`${release.releaseDate}T00:00:00+02:00`) > new Date();
   const dateLong = new Date(release.releaseDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
   const dateShort = new Date(release.releaseDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }).replace('/', '.');
@@ -67,7 +67,7 @@ function Feature({ release }) {
     <article className="release-feature reveal">
       <div className="release-cover tilt" onMouseMove={onTilt} onMouseLeave={resetTilt}>
         <img src={release.cover} alt={`Pochette ${release.title}`} />
-        <span className="release-badge">New release</span>
+        <span className="release-badge">{newest ? 'New release' : 'À la une'}</span>
       </div>
       <div className="release-info">
         <p className="eyebrow">Single · {new Date(release.releaseDate).getFullYear()}</p>

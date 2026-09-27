@@ -28,7 +28,10 @@ public class AdminReleaseController {
     /** @param manualReleaseDate uniquement pour un son pas encore sorti (sinon la date vient de Deezer) */
     public record AddRelease(@NotBlank(message = "Lien obligatoire") @Size(max = 1000) String url, LocalDate manualReleaseDate) {}
 
-    public record UpdateRelease(boolean visible, LocalDate manualReleaseDate) {}
+    /** @param url nouveau lien Fanlink (vide = inchangé) */
+    public record UpdateRelease(@Size(max = 1000) String url, boolean visible, LocalDate manualReleaseDate) {}
+
+    public record PinRelease(boolean pinned) {}
 
     private final ReleaseService releases;
 
@@ -48,8 +51,13 @@ public class AdminReleaseController {
     }
 
     @PutMapping("/{id}")
-    AdminReleaseView update(@PathVariable Long id, @RequestBody UpdateRelease body) {
-        return releases.update(id, body.visible(), body.manualReleaseDate());
+    AdminReleaseView update(@PathVariable Long id, @Valid @RequestBody UpdateRelease body) {
+        return releases.update(id, body.url(), body.visible(), body.manualReleaseDate());
+    }
+
+    @PutMapping("/{id}/pin")
+    List<AdminReleaseView> pin(@PathVariable Long id, @RequestBody PinRelease body) {
+        return releases.pin(id, body.pinned());
     }
 
     @PostMapping("/{id}/sync")

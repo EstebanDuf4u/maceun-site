@@ -55,7 +55,8 @@ export const adminApi = {
 
   releases: () => request('/admin/releases'),
   addRelease: (url, manualReleaseDate) => request('/admin/releases', { method: 'POST', json: { url, manualReleaseDate: manualReleaseDate || null } }),
-  updateRelease: (id, visible, manualReleaseDate) => request(`/admin/releases/${id}`, { method: 'PUT', json: { visible, manualReleaseDate: manualReleaseDate || null } }),
+  updateRelease: (id, { url, visible, manualReleaseDate }) => request(`/admin/releases/${id}`, { method: 'PUT', json: { url: url || null, visible, manualReleaseDate: manualReleaseDate || null } }),
+  pinRelease: (id, pinned) => request(`/admin/releases/${id}/pin`, { method: 'PUT', json: { pinned } }),
   syncRelease: (id) => request(`/admin/releases/${id}/sync`, { method: 'POST' }),
   deleteRelease: (id) => request(`/admin/releases/${id}`, { method: 'DELETE' }),
 

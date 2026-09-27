@@ -12,7 +12,9 @@ export default function ReleasesAdmin({ notify, onError }) {
   const [busy, setBusy] = useState(null);         // id en cours de mise à jour
 
   const today = new Date().toISOString().slice(0, 10);
-  const featured = releases?.find((r) => r.visible && r.title && r.releaseDate);
+  // même règle que le site : le son épinglé, sinon le plus récent
+  const shown = releases?.filter((r) => r.visible && r.title && r.releaseDate) ?? [];
+  const featured = shown.find((r) => r.pinned) ?? shown[0];
 
   const add = async (e) => {
     e.preventDefault();
@@ -40,8 +42,17 @@ export default function ReleasesAdmin({ notify, onError }) {
 
   const toggle = async (r) => {
     setBusy(r.id);
-    try { await adminApi.updateRelease(r.id, !r.visible, r.manualReleaseDate); reload(); }
+    try { await adminApi.updateRelease(r.id, { visible: !r.visible, manualReleaseDate: r.manualReleaseDate }); reload(); }
     catch (err) { onError(err); } finally { setBusy(null); }
+  };
+
+  const pin = async (r) => {
+    setBusy(r.id);
+    try {
+      await adminApi.pinRelease(r.id, !r.pinned);
+      notify(r.pinned ? 'Épingle retirée : le son le plus récent est mis en avant' : `« ${r.title} » épinglé en avant sur le site`);
+      reload();
+    } catch (err) { onError(err); } finally { setBusy(null); }
   };
 
   const remove = async (r) => {
@@ -81,6 +92,7 @@ export default function ReleasesAdmin({ notify, onError }) {
             <div className="adm-card-body">
               <div className="adm-badges">
                 {r.id === featured?.id && <span className="adm-badge adm-badge-accent">Mise en avant</span>}
+                {r.pinned && <span className="adm-badge">📌 Épinglé</span>}
                 {r.releaseDate > today && <span className="adm-badge">À venir</span>}
                 {!r.visible && <span className="adm-badge adm-badge-muted">Masqué</span>}
                 {r.syncError && <span className="adm-badge adm-badge-error">Erreur</span>}
@@ -97,7 +109,11 @@ export default function ReleasesAdmin({ notify, onError }) {
               <div className="adm-card-actions">
                 <button className="adm-btn adm-btn-small" disabled={busy === r.id} onClick={() => sync(r)}>{busy === r.id ? '…' : 'Actualiser'}</button>
                 <button className="adm-btn adm-btn-small" disabled={busy === r.id} onClick={() => toggle(r)}>{r.visible ? 'Masquer' : 'Afficher'}</button>
-                <button className="adm-btn adm-btn-small" onClick={() => setEditing(r)}>Date</button>
+                <button className="adm-btn adm-btn-small" disabled={busy === r.id || (!r.visible && !r.pinned)} onClick={() => pin(r)}
+                  title={r.visible ? 'Mettre ce son en avant sur le site' : 'Affichez ce son pour pouvoir l\'épingler'}>
+                  {r.pinned ? 'Désépingler' : 'Épingler'}
+                </button>
+                <button className="adm-btn adm-btn-small" onClick={() => setEditing(r)}>Modifier</button>
                 <DeleteButton onConfirm={() => remove(r)} label="Retirer" />
               </div>
             </div>
@@ -106,10 +122,10 @@ export default function ReleasesAdmin({ notify, onError }) {
       </div>
 
       {editing && (
-        <DateForm
+        <EditForm
           release={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); notify('Date enregistrée'); reload(); }}
+          onSaved={(r) => { setEditing(null); notify(`« ${r.title} » mis à jour`); reload(); }}
           onError={onError}
         />
       )}
@@ -117,29 +133,34 @@ export default function ReleasesAdmin({ notify, onError }) {
   );
 }
 
-function DateForm({ release, onClose, onSaved, onError }) {
+function EditForm({ release, onClose, onSaved, onError }) {
+  const [url, setUrl] = useState(release.url);
   const [date, setDate] = useState(release.manualReleaseDate ?? '');
+  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const save = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    try { await adminApi.updateRelease(release.id, release.visible, date); onSaved(); }
-    catch (err) { onError(err); setSaving(false); }
+    setSaving(true); setError('');
+    try {
+      onSaved(await adminApi.updateRelease(release.id, { url, visible: release.visible, manualReleaseDate: date }));
+    } catch (err) {
+      if (err.status === 401) onError(err); else setError(err.message);
+      setSaving(false);
+    }
   };
   return (
-    <Modal title={`Date de sortie · ${release.title ?? ''}`} onClose={onClose}>
+    <Modal title={`Modifier · ${release.title ?? ''}`} onClose={onClose}>
       <form className="adm-form" onSubmit={save}>
-        <p className="adm-muted">
-          Utile uniquement pour un son pas encore sorti (compte à rebours sur le site).
-          Dès que Deezer connaît le son, c'est sa date qui est utilisée.
-        </p>
-        <Field label="Date de sortie">
+        <Field label="Lien Fanlink" error={error} hint="Le nouveau lien est vérifié : s'il ne répond pas, l'ancien est gardé.">
+          <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} required />
+        </Field>
+        <Field label="Date de sortie (optionnel)" hint="Seulement pour un son pas encore sorti. Dès que Deezer connaît le son, c'est sa date qui compte.">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <div className="adm-form-actions">
-          {release.manualReleaseDate && <button type="button" className="adm-btn adm-btn-ghost" onClick={() => setDate('')}>Effacer</button>}
+          {date && <button type="button" className="adm-btn adm-btn-ghost" onClick={() => setDate('')}>Effacer la date</button>}
           <button type="button" className="adm-btn adm-btn-ghost" onClick={onClose}>Annuler</button>
-          <button className="adm-btn adm-btn-primary" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
+          <button className="adm-btn adm-btn-primary" disabled={saving}>{saving ? 'Vérification…' : 'Enregistrer'}</button>
         </div>
       </form>
     </Modal>
