@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
-import { LogoMark } from './Icons';
+import Logo from './Logo';
+
+/** Sections à fond clair : le header passe en noir (logo noir) quand il est au-dessus. */
+const LIGHT_SECTIONS = '.section-light, .footer';
 
 export default function Header({ menuOpen, onToggleMenu }) {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [onLight, setOnLight] = useState(false);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -12,16 +16,26 @@ export default function Header({ menuOpen, onToggleMenu }) {
       setScrolled(y > 60);
       setHidden(y > lastY && y > window.innerHeight * 0.6);   // se cache en descendant, revient en remontant
       lastY = y;
+      // fond sous le milieu du header
+      const probe = document.querySelector('.header')?.getBoundingClientRect();
+      const mid = probe ? probe.top + probe.height / 2 : 40;
+      setOnLight([...document.querySelectorAll(LIGHT_SECTIONS)].some((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top <= mid && r.bottom >= mid;
+      }));
     };
+    onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', onScroll);
+    return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); };
   }, []);
 
-  const cls = ['header', scrolled && 'is-scrolled', hidden && !menuOpen && 'is-hidden'].filter(Boolean).join(' ');
+  const light = onLight && !menuOpen;            // le menu ouvert est toujours sur fond sombre
+  const cls = ['header', scrolled && 'is-scrolled', hidden && !menuOpen && 'is-hidden', light && 'is-on-light'].filter(Boolean).join(' ');
   return (
     <header className={cls}>
       <a href="#top" className="logo" aria-label="Accueil">
-        <LogoMark />
+        <Logo onLight={light} className="logo-mark" />
         <span>MACEUN</span>
       </a>
       <button className="menu-btn" aria-expanded={menuOpen} aria-controls="nav" onClick={onToggleMenu}>

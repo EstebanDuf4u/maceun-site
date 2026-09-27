@@ -57,7 +57,7 @@ export default function AdminApp() {
     <div className="adm">
       <header className="adm-top">
         <a href="/admin" className="adm-brand">
-          <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" /><path d="M44 22h12v22h22v12H56v22H44V56H22V44h22z" /></svg>
+          <img src="/img/logo-blanc.png" alt="" width="56" height="56" />
           <span>MACEUN</span><small>admin</small>
         </a>
         <nav className="adm-tabs">

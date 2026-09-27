@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { reduceMotion } from '../lib/scroll';
 
-/** Croix qui tourne par crans + compteur, puis le cercle s'ouvre sur le site. */
+/** Logo qui tourne par crans + compteur, puis le cercle s'ouvre sur le site. */
 export default function Loader({ onDone }) {
   const [count, setCount] = useState(0);
   const [done, setDone] = useState(false);
@@ -28,7 +28,7 @@ export default function Loader({ onDone }) {
 
   return (
     <div className={`loader${done ? ' is-done' : ''}`} aria-hidden="true">
-      <svg className="loader-cross" viewBox="0 0 100 100"><path d="M42 10h16v32h32v16H58v32H42V58H10V42h32z" /></svg>
+      <img src="/img/logo-blanc.png" alt="" className="loader-cross" width="96" height="96" />
       <div className="loader-count">{String(count).padStart(3, '0')}</div>
     </div>
   );
