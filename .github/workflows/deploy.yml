@@ -2,7 +2,7 @@
 # (seulement si les tests passent). Même serveur et même principe que rutrack.
 #
 # Secrets GitHub requis (Settings → Secrets and variables → Actions) :
-#   SSH_HOST, SSH_USER, SSH_PASSWORD, SSH_KNOWN_HOSTS, DEPLOY_PATH
+#   SSH_HOST, SSH_USER, SSH_PRIVATE_KEY (clé de déploiement), SSH_KNOWN_HOSTS, DEPLOY_PATH
 # Le `.env` de production vit uniquement sur le serveur (modèle : deploy/.env.prod.example).
 name: CI/CD
 
@@ -51,7 +51,7 @@ jobs:
       cancel-in-progress: false
     env:
       # Les secrets ne sont pas lisibles dans un `if:` : on passe par l'env.
-      DEPLOY_CONFIGURED: ${{ secrets.SSH_PASSWORD != '' && secrets.SSH_HOST != '' }}
+      DEPLOY_CONFIGURED: ${{ secrets.SSH_PRIVATE_KEY != '' && secrets.SSH_HOST != '' }}
     steps:
       - name: Skip if the server is not configured yet
         if: env.DEPLOY_CONFIGURED != 'true'
@@ -63,39 +63,34 @@ jobs:
       - name: Configure SSH
         if: env.DEPLOY_CONFIGURED == 'true'
         run: |
-          sudo apt-get install -y -qq sshpass
-          mkdir -p ~/.ssh
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf 'Host server\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' \
+            "${{ secrets.SSH_HOST }}" "${{ secrets.SSH_USER }}" > ~/.ssh/config
 
       - name: Check server setup
         if: env.DEPLOY_CONFIGURED == 'true'
         # Le .env de prod est créé une seule fois par deploy/setup-server.sh.
-        env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: >
-          sshpass -e ssh -o PubkeyAuthentication=no "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          ssh server
           "test -f '${{ secrets.DEPLOY_PATH }}/.env'
           || { echo '::error::.env absent sur le serveur : lancer deploy/setup-server.sh (voir docs/DEPLOY.md)'; exit 1; }"
 
       - name: Sync code to server
         if: env.DEPLOY_CONFIGURED == 'true'
         # --delete garde le serveur identique au repo ; `.env` (exclu) n'est jamais touché.
-        env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: >
           rsync -az --delete
           --exclude '.git' --exclude '.github' --exclude '.env'
           --exclude 'node_modules' --exclude 'dist' --exclude 'target' --exclude 'uploads'
-          -e "sshpass -e ssh -o PubkeyAuthentication=no"
-          ./ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/"
+          ./ "server:${{ secrets.DEPLOY_PATH }}/"
 
       - name: Rebuild and restart
         if: env.DEPLOY_CONFIGURED == 'true'
         # Migrations Flyway appliquées au démarrage du backend.
-        env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: >
-          sshpass -e ssh -o PubkeyAuthentication=no "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          ssh server
           "cd '${{ secrets.DEPLOY_PATH }}'
           && docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 300
           && docker image prune -f"
@@ -103,10 +98,8 @@ jobs:
       - name: Smoke test
         if: env.DEPLOY_CONFIGURED == 'true'
         # Vérifie depuis le serveur que le site et l'API répondent (sans dépendre du DNS).
-        env:
-          SSHPASS: ${{ secrets.SSH_PASSWORD }}
         run: >
-          sshpass -e ssh -o PubkeyAuthentication=no "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          ssh server
           "cd '${{ secrets.DEPLOY_PATH }}'
           && PORT=\$(grep -E '^WEB_PORT=' .env | cut -d= -f2) && PORT=\${PORT:-8081}
           && curl -fsS -o /dev/null http://127.0.0.1:\$PORT/

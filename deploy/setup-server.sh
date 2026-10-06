@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Installation initiale sur le serveur (une seule fois), à lancer en tant qu'esteban :
-#   scp deploy/setup-server.sh deploy/nginx-maceun.conf esteban@79.175.70.167:/tmp/
-#   ssh -t esteban@79.175.70.167 'bash /tmp/setup-server.sh'
+# Installation initiale sur le serveur (une seule fois), à lancer en tant qu'ubuntu :
+#   rsync -a deploy/ ubuntu@164.132.192.219:maceun-site/deploy/
+#   ssh -t ubuntu@164.132.192.219 'cd ~/maceun-site/deploy && bash setup-server.sh'
 # Idempotent : relançable sans risque (ne remplace jamais un .env existant).
 set -euo pipefail
 
-DEPLOY_PATH="${DEPLOY_PATH:-/home/esteban/maceun-site}"
+DEPLOY_PATH="${DEPLOY_PATH:-$HOME/maceun-site}"
 DOMAIN="maceunofficiel.fr"
 SITE="/etc/nginx/sites-available/$DOMAIN"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -57,7 +57,7 @@ else
   CERT=/etc/ssl/maceun/fullchain.pem; KEY=/etc/ssl/maceun/privkey.pem
 fi
 
-# 4. Site nginx de l'hôte (ne touche pas aux autres sites : rutrack, deb1, deb2)
+# 4. Site nginx de l'hôte (ne touche pas aux autres sites : rutrack, noryx.fr)
 sudo mkdir -p /var/www/certbot
 sed -e "s/__WEB_PORT__/$PORT/" -e "s#__CERT__#$CERT#" -e "s#__KEY__#$KEY#" "$HERE/nginx-maceun.conf" | sudo tee "$SITE" > /dev/null
 sudo ln -sf "$SITE" "/etc/nginx/sites-enabled/$DOMAIN"
